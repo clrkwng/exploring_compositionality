@@ -36,8 +36,6 @@ class WangNet(nn.Module):
 		
 		# Parameter is telling PyTorch to learn this tensor
 		self.embed_dim = emb_dims[1]
-		# self.emb = nn.Parameter(torch.zeros(emb_dims[0], self.embed_dim))
-		# nn.init.normal_(self.emb , std=0.02)
 		self.embedder = nn.Embedding(num_embeddings=emb_dims[0], embedding_dim=self.embed_dim)
 		self.normalize_input = nn.BatchNorm1d(no_of_cont, affine=False)
 
@@ -50,7 +48,7 @@ class WangNet(nn.Module):
 		nn.init.kaiming_normal_(self.output_layer.weight.data)
 
 	def forward(self, cont_data, cat_data):
-		cont_data = self.normalize_input(cont_data)
+		# cont_data = self.normalize_input(cont_data)
 
 		if self.embed_dim != 0:
 			# x = [self.emb[xi] for xi in cat_data]
@@ -59,6 +57,8 @@ class WangNet(nn.Module):
 			x = torch.cat([cont_data, x], dim=1)
 		else:
 			x = cont_data
+
+		# print(x)
 
 		for lbd_layer in self.lbd_layers:
 			x = lbd_layer(x)
