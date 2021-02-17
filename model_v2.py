@@ -58,8 +58,6 @@ class WangNet(nn.Module):
 		else:
 			x = cont_data
 
-		# print(x)
-
 		for lbd_layer in self.lbd_layers:
 			x = lbd_layer(x)
 
