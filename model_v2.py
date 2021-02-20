@@ -37,7 +37,7 @@ class WangNet(nn.Module):
 		# Parameter is telling PyTorch to learn this tensor
 		self.embed_dim = emb_dims[1]
 		self.embedder = nn.Embedding(num_embeddings=emb_dims[0], embedding_dim=self.embed_dim)
-		self.normalize_input = nn.BatchNorm1d(no_of_cont, affine=False)
+		# self.normalize_input = nn.BatchNorm1d(no_of_cont, affine=False)
 
 		# Can implement varying dropout_p for each layer (maybe input and hidden layers will differ) later on.
 		input_size = self.embed_dim + no_of_cont
