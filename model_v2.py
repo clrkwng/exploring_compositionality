@@ -34,7 +34,6 @@ class WangNet(nn.Module):
 	def __init__(self, emb_dims, no_of_cont, lin_layer_sizes, output_size, hidden_drop_p, batch_flag):
 		super().__init__()
 		
-		# Parameter is telling PyTorch to learn this tensor
 		self.embed_dim = emb_dims[1]
 		self.embedder = nn.Embedding(num_embeddings=emb_dims[0], embedding_dim=self.embed_dim)
 		# self.normalize_input = nn.BatchNorm1d(no_of_cont, affine=False)
