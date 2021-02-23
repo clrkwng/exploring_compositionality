@@ -1,7 +1,6 @@
 import numpy as np
-import torch
 
-# Global Cache that stores the statistics of train set and each test set.
+# Global cache that stores the statistics of train set and each test set.
 cache = {}
 
 # g : R^2 -> {0,1}.
@@ -11,7 +10,7 @@ def true_g(X):
 
 # Given g, and each x in X is in R^3.
 def true_f(g, X):
-	g_result = g(X[:,:2])
+	g_result = g(X[:, :2])
 	return (g_result) * (1 - X[:, 2]) + (1 - g_result) * X[:, 2]
 
 # Standardize the data (subtract mean, divide by std).
