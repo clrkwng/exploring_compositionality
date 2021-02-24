@@ -79,3 +79,5 @@ def get_train_data(train_size):
 	cache["X_train_std"] = X_std
 
 	return X, true_labels, rotated_labels
+
+def get_test_splitB(test_size):
