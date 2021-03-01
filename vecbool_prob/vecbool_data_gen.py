@@ -1,11 +1,43 @@
 import numpy as np
+import sys
+sys.path[0] = '../pickled_files/'
+from pickle_logic import *
 
+import matplotlib
+from matplotlib import pyplot as plt
+
+from pathlib import Path
+my_file = Path("../pickled_files/stats_cache.pickle")
 # Global cache that stores the statistics of train set and each test set.
-cache = {}
+cache = load_pickle("../pickled_files/stats_cache.pickle") if my_file.is_file() else {}
 
-num_classes = 10
-boolvec_dim = 4
+# Define the model parameters here.
 cont_range = [0, 5]
+
+boolvec_dim = 4
+emb_dims = [2 * boolvec_dim, 4 * boolvec_dim]
+num_cont = 2
+lin_layer_sizes = [128, 512, 128, 64, 32, 20]
+num_classes = 10
+hidden_drop_p = 0.1
+batch_flag = False
+
+# Flag denotes whether to use true labels, or labels after mod rotation.
+useRealLabels = False
+
+def save_plot(xvalues, yvalues, xlabel, ylabel, title, file_name):
+	if len(yvalues) == 1:
+		plt.plot(xvalues, yvalues[0])
+	else:
+		plt.plot(xvalues, yvalues[0], label="Train Accuracy")
+		plt.plot(xvalues, yvalues[1], label="Validation Accuracy")
+		plt.legend(loc="upper left")
+
+	plt.suptitle(title, fontsize=18)
+	plt.xlabel(xlabel, fontsize=14)
+	plt.ylabel(ylabel, fontsize=14)
+	plt.savefig(file_name)
+	plt.clf()
 
 # Standardize the data (subtract mean, divide by std).
 # Will use training data's mean and std for both train and test data.
@@ -13,19 +45,16 @@ def standardize_data(X_orig, train_mode=False):
 	global cache
 
 	X = np.copy(X_orig)
+	X_mean = np.mean(X[:, :2], axis=0)
+	X_std = np.std(X[:, :2], axis=0)
 
 	if train_mode:
-		X_mean = np.mean(X[:, :2], axis=0)
-		X_std = np.std(X[:, :2], axis=0)
 		X[:, :2] -= X_mean
 		X[:, :2] /= X_std
 
 	else:
 		assert "X_train_mean" in cache and "X_train_std" in cache,\
 			"Train data statistics have not been cached yet."
-
-		X_mean = np.mean(X[:, :2], axis=0)
-		X_std = np.std(X[:, :2], axis=0)
 		X[:, :2] -= cache["X_train_mean"]
 		X[:, :2] /= cache["X_train_std"]
 
@@ -33,8 +62,9 @@ def standardize_data(X_orig, train_mode=False):
 
 # Return unstandardized data, used for plotting.
 def unstandardize_data(X_orig, X_mean, X_std):
-	X = np.copy(X_orig)
+	global cache
 
+	X = np.copy(X_orig)
 	X[:, :2] *= X_std
 	X[:, :2] += X_mean
 
@@ -68,16 +98,40 @@ def rotate_class(classes, rot_amts):
 def get_bool_vecs(train_size):
 	return np.random.randint(2, size=(train_size, boolvec_dim))
 
+# Returns the number of correct predictions.
+def get_num_correct(preds, labels):
+	pred = preds.max(1, keepdim=True)[1]
+	correct = pred.eq(labels.view_as(pred)).sum().item()
+	return correct
+
 def get_train_data(train_size):
+	global cache
+
 	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(train_size, 2))
 	X_02 = get_bool_vecs(train_size)
 	X = np.concatenate((X_01, X_02), axis=1)
 	true_labels, rotated_labels = true_f(true_g, X)
 
-	X, X_mean, X_std = standardize_data(X, train_mode=True)
-	cache["X_train_mean"] = X_mean
-	cache["X_train_std"] = X_std
+	X_train, X_train_mean, X_train_std = standardize_data(X, train_mode=True)
+	cache["X_train_mean"] = X_train_mean
+	cache["X_train_std"] = X_train_std
 
-	return X, true_labels, rotated_labels
+	return X_train, true_labels if useRealLabels else rotated_labels
 
+# This test distribution is the same as the training distribution.
+def get_test_splitA(test_size):
+	global cache
+
+	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(test_size, 2))
+	X_02 = get_bool_vecs(test_size)
+	X = np.concatenate((X_01, X_02), axis=1)
+	true_labels, rotated_labels = true_f(true_g, X)
+
+	X_test, X_test_mean, X_test_std = standardize_data(X)
+	cache["X_testA_mean"] = X_test_mean
+	cache["X_testA_std"] = X_test_std
+
+	return X_test, true_labels if useRealLabels else rotated_labels
+
+# This test distribution tests compositionality.
 # def get_test_splitB(test_size):
