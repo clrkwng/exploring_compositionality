@@ -1,12 +1,12 @@
 import numpy as np
 import sys
+from bool_utils import *
 sys.path[0] = '../pickled_files/'
 from pickle_logic import *
-
 import matplotlib
 from matplotlib import pyplot as plt
-
 from pathlib import Path
+
 my_file = Path("../pickled_files/stats_cache.pickle")
 # Global cache that stores the statistics of train set and each test set.
 cache = load_pickle("../pickled_files/stats_cache.pickle") if my_file.is_file() else {}
@@ -14,13 +14,15 @@ cache = load_pickle("../pickled_files/stats_cache.pickle") if my_file.is_file() 
 # Define the model parameters here.
 cont_range = [0, 5]
 
-boolvec_dim = 4
+boolvec_dim = 6
 emb_dims = [2 * boolvec_dim, 4 * boolvec_dim]
 num_cont = 2
-lin_layer_sizes = [128, 512, 128, 64, 32, 20]
+lin_layer_sizes = [512, 256, 128, 64, 32, 20]
 num_classes = 10
 hidden_drop_p = 0.1
-batch_flag = False
+batch_flag = True
+
+rep_bools = get_representative_bools(boolvec_dim)
 
 # Flag denotes whether to use true labels, or labels after mod rotation.
 useRealLabels = False
@@ -55,6 +57,7 @@ def standardize_data(X_orig, train_mode=False):
 	else:
 		assert "X_train_mean" in cache and "X_train_std" in cache,\
 			"Train data statistics have not been cached yet."
+			
 		X[:, :2] -= cache["X_train_mean"]
 		X[:, :2] /= cache["X_train_std"]
 
@@ -83,20 +86,8 @@ def true_g(X):
 def true_f(g, X):
 	true_labels = g(X[:, :2])
 	rot_amts = get_rotation_amount(X[:, 2:].T)
-	rotated_labels = rotate_class(true_labels, rot_amts)
+	rotated_labels = rotate_class(true_labels, rot_amts, num_classes)
 	return true_labels, rotated_labels
-
-# Returns a weighted sum of value times one-indexed index val.
-def get_rotation_amount(bool_vec):
-	return sum([i * val for i, val in enumerate(bool_vec, start=1)])
-
-# Given classes and rotation amount, rotate class under mod num_classes.
-def rotate_class(classes, rot_amts):
-	return (classes + rot_amts) % num_classes
-
-# Return an array of random boolean vectors, where each row is a vector.
-def get_bool_vecs(train_size):
-	return np.random.randint(2, size=(train_size, boolvec_dim))
 
 # Returns the number of correct predictions.
 def get_num_correct(preds, labels):
@@ -108,7 +99,7 @@ def get_train_data(train_size):
 	global cache
 
 	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(train_size, 2))
-	X_02 = get_bool_vecs(train_size)
+	X_02 = get_rep_bool_vecs(train_size, boolvec_dim, rep_bools)
 	X = np.concatenate((X_01, X_02), axis=1)
 	true_labels, rotated_labels = true_f(true_g, X)
 
@@ -123,7 +114,7 @@ def get_test_splitA(test_size):
 	global cache
 
 	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(test_size, 2))
-	X_02 = get_bool_vecs(test_size)
+	X_02 = get_rand_bool_vecs(test_size, boolvec_dim)
 	X = np.concatenate((X_01, X_02), axis=1)
 	true_labels, rotated_labels = true_f(true_g, X)
 
@@ -133,5 +124,18 @@ def get_test_splitA(test_size):
 
 	return X_test, true_labels if useRealLabels else rotated_labels
 
+test_dist = 5
 # This test distribution tests compositionality.
-# def get_test_splitB(test_size):
+def get_test_splitB(test_size):
+	global cache
+
+	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(test_size, 2))
+	X_02 = get_dist_bool_vecs(test_size, boolvec_dim, rep_bools, test_dist)
+	X = np.concatenate((X_01, X_02), axis=1)
+	true_labels, rotated_labels = true_f(true_g, X)
+
+	X_test, X_test_mean, X_test_std = standardize_data(X)
+	cache["X_testB_mean"] = X_test_mean
+	cache["X_testB_std"] = X_test_std
+
+	return X_test, true_labels if useRealLabels else rotated_labels

@@ -15,8 +15,8 @@ from model_v2 import *
 sys.path[0] = '../pickled_files/'
 from pickle_logic import *
 
-def get_testing_data(test_size):
-	X_test, y_test = get_test_splitA(test_size)
+def get_testing_data(test_size, test_split_fn):
+	X_test, y_test = test_split_fn(test_size)
 	X_test = torch.tensor(X_test).cuda()
 	y_test = torch.tensor(y_test).cuda()
 
@@ -27,19 +27,21 @@ def get_testing_data(test_size):
 
 def main():
 	assert torch.cuda.is_available(), "GPU isn't available."
+
 	model = WangNet(boolvec_dim=boolvec_dim, emb_dims=emb_dims, num_cont=num_cont, lin_layer_sizes=lin_layer_sizes, \
                		output_size=num_classes, hidden_drop_p=hidden_drop_p, batch_flag=batch_flag).cuda()
 	save_path = "../saved_model_params/vecbool_model_state_dict.pt"
 	model.load_state_dict(torch.load(save_path))
 
 	test_size = 1000
-	cont_x, cat_x, y_test = get_testing_data(test_size)
+	cont_x, cat_x, y_test = get_testing_data(test_size, get_test_splitB)
 
 	model.eval()
 	with torch.no_grad():
 		preds = model(cont_x, cat_x)
+		test_acc = get_num_correct(preds, y_test) / test_size
 
-	print(f"Test Accuracy: {get_num_correct(preds, y_test)/test_size}")
+	print(f"Test Accuracy: {test_acc}")
 
 if __name__ == "__main__":
 	main()

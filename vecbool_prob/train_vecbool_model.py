@@ -60,8 +60,8 @@ def train_model(model, n_epochs, trainloader, valid_data, num_batches, train_siz
 
 			loss.backward()
 			optimizer.step()
-		epoch_loss = total_loss/num_batches
-		train_acc = train_correct/train_size
+		epoch_loss = round(total_loss/num_batches, 6)
+		train_acc = round(train_correct/train_size, 6)
 		
 		# Getting the validation accuracy now.
 		val_inputs, val_labels = valid_data
@@ -70,9 +70,9 @@ def train_model(model, n_epochs, trainloader, valid_data, num_batches, train_siz
 		model.eval()
 		with torch.no_grad():
 			val_preds = model(cont_val, cat_val)
-			val_acc = get_num_correct(val_preds, val_labels)/val_inputs.shape[0]
+			val_acc = round(get_num_correct(val_preds, val_labels)/val_inputs.shape[0], 6)
 
-		t.set_description(f"Epoch: {epoch}/{n_epochs}, Loss: {total_loss/num_batches}, Train Acc: {train_acc}, Val Acc: {val_acc}")
+		t.set_description(f"Epoch: {epoch}/{n_epochs}, Loss: {epoch_loss}, Train Acc: {train_acc}, Val Acc: {val_acc}")
 
 		if val_acc > best_val_acc:
 			best_val_acc = val_acc
