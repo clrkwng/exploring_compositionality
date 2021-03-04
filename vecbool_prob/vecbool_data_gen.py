@@ -1,20 +1,21 @@
 import numpy as np
 import sys
 from bool_utils import *
+from gen_rep_bools import *
 sys.path[0] = '../pickled_files/'
 from pickle_logic import *
 import matplotlib
 from matplotlib import pyplot as plt
 from pathlib import Path
 
-my_file = Path("../pickled_files/stats_cache.pickle")
+cache_file = Path("../pickled_files/stats_cache.pickle")
 # Global cache that stores the statistics of train set and each test set.
-cache = load_pickle("../pickled_files/stats_cache.pickle") if my_file.is_file() else {}
+cache = load_pickle("../pickled_files/stats_cache.pickle") if cache_file.is_file() else {}
 
 # Define the model parameters here.
 cont_range = [0, 5]
 
-boolvec_dim = 6
+# boolvec_dim is defined in gen_rep_bools.py.
 emb_dims = [2 * boolvec_dim, 4 * boolvec_dim]
 num_cont = 2
 lin_layer_sizes = [512, 256, 128, 64, 32, 20]
@@ -22,7 +23,8 @@ num_classes = 10
 hidden_drop_p = 0.1
 batch_flag = True
 
-rep_bools = get_representative_bools(boolvec_dim)
+bools_file = Path("../pickled_files/rep_bools.pickle")
+rep_bools = load_pickle("../pickled_files/rep_bools.pickle") if bools_file.is_file() else gen_bools()
 
 # Flag denotes whether to use true labels, or labels after mod rotation.
 useRealLabels = False
@@ -97,6 +99,7 @@ def get_num_correct(preds, labels):
 
 def get_train_data(train_size):
 	global cache
+	global rep_bools
 
 	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(train_size, 2))
 	X_02 = get_rep_bool_vecs(train_size, boolvec_dim, rep_bools)
@@ -114,7 +117,7 @@ def get_test_splitA(test_size):
 	global cache
 
 	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(test_size, 2))
-	X_02 = get_rand_bool_vecs(test_size, boolvec_dim)
+	X_02 = get_rep_bool_vecs(test_size, boolvec_dim, rep_bools)
 	X = np.concatenate((X_01, X_02), axis=1)
 	true_labels, rotated_labels = true_f(true_g, X)
 
@@ -124,10 +127,10 @@ def get_test_splitA(test_size):
 
 	return X_test, true_labels if useRealLabels else rotated_labels
 
-test_dist = 5
 # This test distribution tests compositionality.
 def get_test_splitB(test_size):
 	global cache
+	test_dist = 1
 
 	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(test_size, 2))
 	X_02 = get_dist_bool_vecs(test_size, boolvec_dim, rep_bools, test_dist)

@@ -23,6 +23,7 @@ def get_rep_bool_vecs(train_size, boolvec_dim, rep_bools):
 def get_dist_bool_vecs(test_size, boolvec_dim, rep_bools, dist, exclude_train_bools=True):
 	neighbor_bools = get_neighbor_bools(rep_bools, boolvec_dim, dist, exclude_train_bools)
 
+	assert len(neighbor_bools) != 0, "No neighboring boolean vectors!"
 	bool_vecs = np.tile(neighbor_bools, ((int)(np.floor(test_size/len(neighbor_bools))), 1))
 	bool_vecs = np.concatenate((bool_vecs, np.array(neighbor_bools[:test_size - len(bool_vecs)]).reshape(-1, boolvec_dim)), axis=0)
 	np.random.shuffle(bool_vecs)
@@ -48,15 +49,16 @@ def get_all_bitstrings(boolvec_dim):
 		bitstrings.append(vec)
 	return bitstrings
 
-# Grabs all the bitstrings that are "dist" away from one vec in rep_bools.
-# exlude_train_bool flag will signify if we want to keep any of the vecs
+# Grabs all the bitstrings that are "dist" away from closest vec in rep_bools.
+# exlude_train_bool flag will signal if we want to keep any of the vecs
 # that were in our training data or not.
 def get_neighbor_bools(rep_bools, boolvec_dim, dist, exclude_train_bools=True):
 	all_bools = get_all_bitstrings(boolvec_dim)
 	neighbors = []
-	for vec in rep_bools:
-		poss = [x for x in all_bools if num_flips(x, vec) == dist]
-		neighbors.extend(poss)
+	for poss_vec in all_bools:
+		poss_dist = min([num_flips(poss_vec, x) for x in rep_bools])
+		if poss_dist == dist:
+			neighbors.append(poss_vec)
 	if exclude_train_bools:
 		return [list(x) for x in list(set(neighbors) - set(rep_bools))]
 	else:
