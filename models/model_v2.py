@@ -17,7 +17,8 @@ class LBDLayer(nn.Module):
 		self.relu = nn.LeakyReLU()
 
 		self.batch_flag = batch_flag
-		self.batchnorm = nn.BatchNorm1d(output_size)
+		if self.batch_flag:
+			self.batchnorm = nn.BatchNorm1d(output_size)
 
 		self.dropout = nn.Dropout(drop_p)
 
@@ -29,7 +30,6 @@ class LBDLayer(nn.Module):
 			x = self.batchnorm(x)
 
 		x = self.dropout(x)
-
 		return x
 
 class WangNet(nn.Module):
@@ -39,21 +39,25 @@ class WangNet(nn.Module):
 		self.embed_dim = emb_dims[1]
 		if self.embed_dim != 0:
 			self.embedder = nn.Embedding(num_embeddings=emb_dims[0], embedding_dim=self.embed_dim)
-		# self.normalize_input = nn.BatchNorm1d(num_cont, affine=False)
 
-		# Can implement varying dropout_p for each layer (maybe input and hidden layers will differ) later on.
-		input_size = self.embed_dim * boolvec_dim + num_cont
-		self.lbd_layers = nn.ModuleList([LBDLayer(input_size, lin_layer_sizes[0], batch_flag, hidden_drop_p)] + \
-																	[LBDLayer(lin_layer_sizes[i], lin_layer_sizes[i+1], batch_flag, hidden_drop_p) for i in range(len(lin_layer_sizes) - 1)])
+		# Layers that will scale the continuous data up to embedded categorical data size.
+		self.scale_cont_layers = nn.ModuleList([LBDLayer(num_cont, 8, batch_flag, 0), LBDLayer(8, 32, batch_flag, 0), LBDLayer(32, 128, batch_flag, 0), \
+																						LBDLayer(128, self.embed_dim * boolvec_dim, batch_flag, 0)])
+		# Shouldn't use any dropout on the input layer.
+		# The flattened embedded size for each boolean vector is now embed_dim * boolvec_dim
+		# Also, the continuous data has been scaled up to match categorical input size.
+		input_size = (self.embed_dim * boolvec_dim) * 2
+		self.lbd_layers = nn.ModuleList([LBDLayer(input_size, lin_layer_sizes[0], batch_flag, 0)] + \
+		[LBDLayer(lin_layer_sizes[i], lin_layer_sizes[i+1], batch_flag, hidden_drop_p) for i in range(len(lin_layer_sizes) - 1)])
 
 		self.output_layer = nn.Linear(lin_layer_sizes[-1], output_size)
 		nn.init.kaiming_normal_(self.output_layer.weight.data)
 
 	def forward(self, cont_data, cat_data):
-		# cont_data = self.normalize_input(cont_data)
+		for l in self.scale_cont_layers:
+			cont_data = l(cont_data)
+
 		if self.embed_dim != 0:
-			# x = [self.emb[xi] for xi in cat_data]
-			# x = torch.stack(x).squeeze()
 			x = self.embedder(cat_data.long())
 			x = x.reshape(cat_data.shape[0], -1)
 			x = torch.cat([cont_data, x], dim=1)
