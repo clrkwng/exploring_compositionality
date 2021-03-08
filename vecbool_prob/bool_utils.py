@@ -123,4 +123,5 @@ def get_dist_bool_vecs(arr_size, boolvec_dim, rep_bools, dist, exclude_train_boo
 
 # Testing: Convert the categorical boolean vector so that the index is also considered.
 def convert_boolvec_to_position_vec(boolvec):
+	assert max(boolvec) <=1 and min(boolvec) >= 0, "boolvec isn't a boolean vector."
 	return [i if x == 1 else i + boolvec_dim for i, x in enumerate(boolvec, start=0)]
