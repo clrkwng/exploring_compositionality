@@ -8,17 +8,18 @@ import matplotlib
 from matplotlib import pyplot as plt
 from pathlib import Path
 
-cache_file = Path("../pickled_files/stats_cache.pickle")
-# Global cache that stores the statistics of train set and each test set.
-cache = load_pickle("../pickled_files/stats_cache.pickle") if cache_file.is_file() else {}
+# Global cache that stores the statistics of train and test sets.
+cache_path = "../pickled_files/stats_cache.pickle"
+cache_file = Path(cache_path)
+cache = load_pickle(cache_path) if cache_file.is_file() else {}
 
-# Define the model parameters here.
 cont_range = [0, 5]
 
+# Define the model parameters here.
 # boolvec_dim is defined in gen_rep_bools.py.
 emb_dims = [2 * boolvec_dim, 4 * boolvec_dim]
 num_cont = 2
-lin_layer_sizes = [1024, 2048, 800, 512, 128, 32, 20]
+lin_layer_sizes = [680, 2048, 800, 512, 128, 32, 20]
 num_classes = 10
 hidden_drop_p = 0.1
 batch_flag = True
@@ -29,6 +30,7 @@ rep_bools = load_pickle("../pickled_files/rep_bools.pickle") if bools_file.is_fi
 # Flag denotes whether to use true labels, or labels after mod rotation.
 useRealLabels = False
 
+# Save a plot, with the following parameters. yvalues needs to be passed in as a list.
 def save_plot(xvalues, yvalues, xlabel, ylabel, title, file_name, fn):
 	if len(yvalues) == 1:
 		fn(xvalues, yvalues[0])
@@ -49,29 +51,27 @@ def standardize_data(X_orig, train_mode=False):
 	global cache
 
 	X = np.copy(X_orig)
-	X_mean = np.mean(X[:, :2], axis=0)
-	X_std = np.std(X[:, :2], axis=0)
+	X_mean = np.mean(X[:, :num_cont], axis=0)
+	X_std = np.std(X[:, :num_cont], axis=0)
 
 	if train_mode:
-		X[:, :2] -= X_mean
-		X[:, :2] /= X_std
+		X[:, :num_cont] -= X_mean
+		X[:, :num_cont] /= X_std
 
 	else:
 		assert "X_train_mean" in cache and "X_train_std" in cache,\
 			"Train data statistics have not been cached yet."
 			
-		X[:, :2] -= cache["X_train_mean"]
-		X[:, :2] /= cache["X_train_std"]
+		X[:, :num_cont] -= cache["X_train_mean"]
+		X[:, :num_cont] /= cache["X_train_std"]
 
 	return X, X_mean, X_std
 
 # Return unstandardized data, used for plotting.
-def unstandardize_data(X_orig, X_mean, X_std):
-	global cache
-
-	X = np.copy(X_orig)
-	X[:, :2] *= X_std
-	X[:, :2] += X_mean
+def unstandardize_data(X_train, X_mean, X_std):
+	X = np.copy(X_train)
+	X[:, :num_cont] *= X_std
+	X[:, :num_cont] += X_mean
 
 	return X
 
@@ -84,10 +84,10 @@ def true_g(X):
 	percentage = (X_sum - (2 * cont_range[0])) / (2 * (cont_range[1] - cont_range[0]))
 	return np.floor(percentage * num_classes)
 
-# Given g, and each x in X is in R^3.
+# Given g, and each x in X has continuous and categorical data.
 def true_f(g, X):
-	true_labels = g(X[:, :2])
-	rot_amts = get_rotation_amount(X[:, 2:].T)
+	true_labels = g(X[:, :num_cont])
+	rot_amts = get_rotation_amount(X[:, num_cont:].T)
 	rotated_labels = rotate_class(true_labels, rot_amts, num_classes)
 	return true_labels, rotated_labels
 
@@ -101,7 +101,7 @@ def get_train_data(train_size):
 	global cache
 	global rep_bools
 
-	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(train_size, 2))
+	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(train_size, num_cont))
 	X_02 = get_rep_bool_vecs(train_size, boolvec_dim, rep_bools)
 	X = np.concatenate((X_01, X_02), axis=1)
 	true_labels, rotated_labels = true_f(true_g, X)
@@ -116,7 +116,7 @@ def get_train_data(train_size):
 def get_test_splitA(test_size, *unused):
 	global cache
 
-	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(test_size, 2))
+	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(test_size, num_cont))
 	X_02 = get_rep_bool_vecs(test_size, boolvec_dim, rep_bools)
 	X = np.concatenate((X_01, X_02), axis=1)
 	true_labels, rotated_labels = true_f(true_g, X)
@@ -131,7 +131,7 @@ def get_test_splitA(test_size, *unused):
 def get_test_splitB(test_size, test_dist):
 	global cache
 
-	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(test_size, 2))
+	X_01 = np.random.uniform(cont_range[0], cont_range[1], size=(test_size, num_cont))
 	X_02 = get_dist_bool_vecs(test_size, boolvec_dim, rep_bools, test_dist)
 	X = np.concatenate((X_01, X_02), axis=1)
 	true_labels, rotated_labels = true_f(true_g, X)
@@ -140,4 +140,4 @@ def get_test_splitB(test_size, test_dist):
 	cache["X_testB_mean"] = X_test_mean
 	cache["X_testB_std"] = X_test_std
 
-	return X_test, true_labels, rotated_labels # if useRealLabels else rotated_labels
+	return X_test, true_labels if useRealLabels else rotated_labels

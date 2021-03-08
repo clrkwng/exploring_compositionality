@@ -1,15 +1,11 @@
 import numpy as np
 
+boolvec_dim = 5
+
 # Returns a weighted sum of value times one-indexed index.
 def get_rotation_amount(bool_vec):
-	assert all(x >= 0 for x in bool_vec) and all(x <= 1 for x in bool_vec), \
-					"bool_vec is not a proper boolean vector."
-
 	rot_amt = sum([i * val for i, val in enumerate(bool_vec, start=1)])
-	n = len(bool_vec)
-	assert rot_amt >= 0 and rot_amt <= n * (n + 1) / 2, "Rotation amount is out of range."
-	
-	return int(rot_amt)
+	return rot_amt
 
 # Given classes and rotation amount, rotate class under mod num_classes.
 def rotate_class(classes, rot_amts, num_classes):
@@ -41,6 +37,12 @@ def intersect2D(arr1, arr2):
 def get_rep_bool_vecs(arr_size, boolvec_dim, rep_bools):
 	assert len(rep_bools) <= arr_size, "Desired array size is less than the number of rep_bools."
 	assert boolvec_dim + 1 == len(rep_bools), "Mismatch between boolvec_dim and dim of rep_bools."
+
+	# Testing: Remove these lines.
+	# new_rep_bools = []
+	# for i in range(boolvec_dim + 1):
+	# 	new_rep_bools.append(tuple([i * x if x == 1 else -i for i, x in enumerate(rep_bools[i], start=1)]))
+	# rep_bools = new_rep_bools
 
 	# This tries to fit as many multiples of rep_bools into arr_size.
 	bool_vecs = np.tile(rep_bools, ((int)(np.floor(arr_size/(boolvec_dim+1))), 1))
@@ -89,6 +91,8 @@ def get_neighbor_bools(rep_bools, boolvec_dim, dist, exclude_train_bools=True):
 	for poss_vec in all_bools:
 		poss_dist = min([hamming_distance(poss_vec, x) for x in rep_bools])
 		if poss_dist == dist:
+			# Testing: Remove this line.
+			# poss_vec = [i * x if x == 1 else -i for i, x in enumerate(poss_vec, start=1)]
 			neighbors.append(poss_vec)
 
 	return neighbors
@@ -116,3 +120,7 @@ def get_dist_bool_vecs(arr_size, boolvec_dim, rep_bools, dist, exclude_train_boo
 					"Not all the neighbor_bools were used."
 
 	return bool_vecs
+
+# Testing: Convert the categorical boolean vector so that the index is also considered.
+def convert_boolvec_to_position_vec(boolvec):
+	return [i if x == 1 else i + boolvec_dim for i, x in enumerate(boolvec, start=0)]

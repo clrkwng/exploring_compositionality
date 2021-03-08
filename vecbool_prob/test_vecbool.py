@@ -16,15 +16,14 @@ sys.path[0] = '../pickled_files/'
 from pickle_logic import *
 
 def get_testing_data(test_size, test_split_fn, test_dist):
-	X_test, true_labels, y_test = test_split_fn(test_size, test_dist)
+	X_test, y_test = test_split_fn(test_size, test_dist)
 	X_test = torch.tensor(X_test).cuda()
-	true_labels = torch.tensor(true_labels).cuda()
 	y_test = torch.tensor(y_test).cuda()
 
-	cont_x = X_test[:, :2].float()
-	cat_x = X_test[:, 2:].long()
+	cont_x = X_test[:, :num_cont].float()
+	cat_x = X_test[:, num_cont:].long()
 
-	return cont_x, cat_x, true_labels, y_test
+	return cont_x, cat_x, y_test
 
 def main():
 	assert torch.cuda.is_available(), "GPU isn't available."
@@ -44,30 +43,29 @@ def main():
 		max_num_flips += 1
 		print(max_num_flips)
 	
-	print(rep_bools)
 	x_values = []
 	y_values = []
 	for _ in range(10):
 		for test_dist in range(1, max_num_flips):
-			cont_x, cat_x, true_labels, y_test = get_testing_data(test_size, get_test_splitB, test_dist)
+			cont_x, cat_x, y_test = get_testing_data(test_size, get_test_splitB, test_dist)
 
 			# This code only keeps testing data where the ground truth label matches rotated label.
-			matching_indices = ((y_test == true_labels).nonzero(as_tuple=True)[0])
-			if len(matching_indices) != 0:
-				cont_x = cont_x[matching_indices]
-				cat_x = cat_x[matching_indices]
-				y_test = y_test[matching_indices]
+			# matching_indices = ((y_test == true_labels).nonzero(as_tuple=True)[0])
+			# if len(matching_indices) != 0:
+			# 	cont_x = cont_x[matching_indices]
+			# 	cat_x = cat_x[matching_indices]
+			# 	y_test = y_test[matching_indices]
 
-				model.eval()
-				with torch.no_grad():
-					preds = model(cont_x, cat_x)
-					print(f"Predictions: {preds.max(1, keepdim=True)[1]}")
-					print(f"Labels: {y_test}")
-					test_acc = get_num_correct(preds, y_test) / test_size
-				x_values.append(int(test_dist))
-				y_values.append(test_acc)
+			model.eval()
+			with torch.no_grad():
+				preds = model(cont_x, cat_x)
+				print(f"Predictions: {preds.max(1, keepdim=True)[1]}")
+				print(f"Labels: {y_test}")
+				test_acc = get_num_correct(preds, y_test) / test_size
+			x_values.append(int(test_dist))
+			y_values.append(test_acc)
 
-				print(f"Num Flips: {test_dist}, Test Accuracy: {test_acc}")
+			print(f"Num Flips: {test_dist}, Test Accuracy: {test_acc}")
 
 	save_plot(xvalues=x_values, yvalues=[y_values], xlabel='Num Flips',\
 						ylabel='Test Accuracy', title='Test Accuracy vs Num Flips', file_name='test_ac.png', fn=plt.scatter)
