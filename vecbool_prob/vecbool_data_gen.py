@@ -23,7 +23,7 @@ hyper_params = {
 	"boolvec_dim": boolvec_dim, # boolvec_dim is defined in gen_rep_bools.py.
 	"emb_dims": [2 * boolvec_dim, 4 * boolvec_dim],
 	"num_cont": 2,
-	"lin_layer_sizes": [680, 2048, 800, 512, 128, 32, 20],
+	"lin_layer_sizes": [512, 1024, 800, 512, 128, 32, 20],
 	"num_classes": 10,
 	"hidden_drop_p": 0.1,
 	"batch_flag": True,
@@ -33,16 +33,27 @@ hyper_params = {
 	"batch_size": 256
 }
 
+# Flag denotes whether to use true labels, or rotated labels.
+useRealLabels = False
+
+# Toggle this flag, if running the unrotation experiment or not.
+unrotationExperimentFlag = False
+
+# Toggle this flag, if balancing ground truth labels.
+balanceGTLabelFlag = True
+
+test_params = {
+  "useRealLabels": useRealLabels,
+  "unrotationExperimentFlag": unrotationExperimentFlag,
+  "balanceGTLabelFlag": balanceGTLabelFlag
+}
+
 with open('../ssh_keys/comet_api_key.txt', 'r') as file:
 	comet_key = file.read().replace('\n', '')
 
-experiment = Experiment(api_key=comet_key,
-												project_name="vecbool",
-												workspace="clrkwng")
+experiment = Experiment(api_key=comet_key, project_name="vecbool", workspace="clrkwng")
 experiment.log_parameters(hyper_params)
-
-# Flag denotes whether to use true labels, or labels after mod rotation.
-useRealLabels = False
+experiment.log_parameters(test_params)
 
 # Save a plot, with the following parameters. yvalues needs to be passed in as a list.
 def save_plot(xvalues, yvalues, xlabel, ylabel, title, file_name, fn):
@@ -61,16 +72,18 @@ def save_plot(xvalues, yvalues, xlabel, ylabel, title, file_name, fn):
 
 # Standardize the data (subtract mean, divide by std).
 # Will use training data's mean and std for both train and test data.
-def standardize_data(X_orig, train_mode=False):
+def standardize_data(X_orig, mode):
 	global cache
 
 	X = np.copy(X_orig)
 	X_mean = np.mean(X[:, :hyper_params["num_cont"]], axis=0)
 	X_std = np.std(X[:, :hyper_params["num_cont"]], axis=0)
 
-	if train_mode:
+	if mode == "train":
 		X[:, :hyper_params["num_cont"]] -= X_mean
 		X[:, :hyper_params["num_cont"]] /= X_std
+		cache["X_train_mean"] = X_mean
+		cache["X_train_std"] = X_std
 
 	else:
 		assert "X_train_mean" in cache and "X_train_std" in cache,\
@@ -78,8 +91,11 @@ def standardize_data(X_orig, train_mode=False):
 			
 		X[:, :hyper_params["num_cont"]] -= cache["X_train_mean"]
 		X[:, :hyper_params["num_cont"]] /= cache["X_train_std"]
+		cache["X_test" + mode + "_mean"] = X_mean
+		cache["X_test" + mode + "_std"] = X_std
 
-	return X, X_mean, X_std
+	save_pickle(cache, "../pickled_files/stats_cache.pickle")
+	return X
 
 # Return unstandardized data, used for plotting.
 def unstandardize_data(X_train, X_mean, X_std):
@@ -113,20 +129,34 @@ def get_num_correct(preds, labels):
 
 def get_train_data(train_size):
 	global cache
-	global rep_bools
 
+	# Get the training points, along with the ground truth and rotated labels.
 	X_01 = np.random.uniform(hyper_params["cont_range"][0], hyper_params["cont_range"][1], size=(train_size, hyper_params["num_cont"]))
 	X_02 = get_rep_bool_vecs(train_size, hyper_params["boolvec_dim"], hyper_params["rep_bools"])
-	X = np.concatenate((X_01, X_02), axis=1)
-	true_labels, rotated_labels = true_f(true_g, X)
+	X_train = np.concatenate((X_01, X_02), axis=1)
+	true_labels, rotated_labels = true_f(true_g, X_train)
 
-	X_train, X_train_mean, X_train_std = standardize_data(X, train_mode=True)
-	cache["X_train_mean"] = X_train_mean
-	cache["X_train_std"] = X_train_std
+	if balanceGTLabelFlag:
+		# This code will balance the number of samples, based on the ground truth labels.
+		X_rebalanced, true_labels_rebalanced, rotated_labels_rebalanced = [], [], []
+		# min_count is the minimum number of data points present, out of all classes.
+		min_count = min(np.unique(true_labels, return_counts=True)[1])
+		for i in range(hyper_params["num_classes"]):
+			class_indices = (true_labels == i)
+			X_rebalanced.extend(X_train[class_indices][:min_count])
+			true_labels_rebalanced.extend(true_labels[class_indices][:min_count])
+			rotated_labels_rebalanced.extend(rotated_labels[class_indices][:min_count])
+
+		X_train, true_labels, rotated_labels = X_rebalanced, true_labels_rebalanced, rotated_labels_rebalanced
+
+	X_train = standardize_data(X_train, mode="train")
 
 	# Testing: Remove this line.
 	for i in range(len(X_train)):
 		X_train[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_train[i, hyper_params["num_cont"]:])
+
+	if balanceGTLabelFlag:
+		assert min(np.unique(true_labels, return_counts=True)[1]) == max(np.unique(true_labels, return_counts=True)[1]), "Ground truth labels not balanced."
 
 	return X_train, true_labels if useRealLabels else rotated_labels
 
@@ -136,16 +166,30 @@ def get_test_splitA(test_size, *unused):
 
 	X_01 = np.random.uniform(hyper_params["cont_range"][0], hyper_params["cont_range"][1], size=(test_size, hyper_params["num_cont"]))
 	X_02 = get_rep_bool_vecs(test_size, hyper_params["boolvec_dim"], hyper_params["rep_bools"])
-	X = np.concatenate((X_01, X_02), axis=1)
-	true_labels, rotated_labels = true_f(true_g, X)
+	X_test = np.concatenate((X_01, X_02), axis=1)
+	true_labels, rotated_labels = true_f(true_g, X_test)
 
-	X_test, X_test_mean, X_test_std = standardize_data(X)
-	cache["X_testA_mean"] = X_test_mean
-	cache["X_testA_std"] = X_test_std
+	if balanceGTLabelFlag:
+		# This code will balance the number of samples, based on the ground truth labels.
+		X_rebalanced, true_labels_rebalanced, rotated_labels_rebalanced = [], [], []
+		# min_count is the minimum number of data points present, out of all classes.
+		min_count = min(np.unique(true_labels, return_counts=True)[1])
+		for i in range(hyper_params["num_classes"]):
+			class_indices = (true_labels == i)
+			X_rebalanced.extend(X_test[class_indices][:min_count])
+			true_labels_rebalanced.extend(true_labels[class_indices][:min_count])
+			rotated_labels_rebalanced.extend(rotated_labels[class_indices][:min_count])
+
+		X_test, true_labels, rotated_labels = X_rebalanced, true_labels_rebalanced, rotated_labels_rebalanced
+
+	X_test = standardize_data(X_test, mode="A")
 
 	# Testing: Remove this line.
 	for i in range(len(X_test)):
 		X_test[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_test[i, hyper_params["num_cont"]:])
+
+	if balanceGTLabelFlag:
+		assert min(np.unique(true_labels, return_counts=True)[1]) == max(np.unique(true_labels, return_counts=True)[1]), "Ground truth labels not balanced."
 
 	return X_test, true_labels if useRealLabels else rotated_labels
 
@@ -155,15 +199,34 @@ def get_test_splitB(test_size, test_dist):
 
 	X_01 = np.random.uniform(hyper_params["cont_range"][0], hyper_params["cont_range"][1], size=(test_size, hyper_params["num_cont"]))
 	X_02 = get_dist_bool_vecs(test_size, hyper_params["boolvec_dim"], hyper_params["rep_bools"], test_dist)
-	X = np.concatenate((X_01, X_02), axis=1)
-	true_labels, rotated_labels = true_f(true_g, X)
+	X_test = np.concatenate((X_01, X_02), axis=1)
+	true_labels, rotated_labels = true_f(true_g, X_test)
 
-	X_test, X_test_mean, X_test_std = standardize_data(X)
-	cache["X_testB_mean"] = X_test_mean
-	cache["X_testB_std"] = X_test_std
+	if unrotationExperimentFlag:
+		matching_indices = (true_labels == rotated_labels)
+		true_labels = true_labels[matching_indices]
+		rotated_labels = rotated_labels[matching_indices]
+		X_test = X_test[matching_indices]
+
+	if balanceGTLabelFlag:
+		X_rebalanced, true_labels_rebalanced, rotated_labels_rebalanced = [], [], []
+		# min_count is the minimum number of data points present, out of all classes.
+		min_count = min(np.unique(true_labels, return_counts=True)[1])
+		for i in range(hyper_params["num_classes"]):
+			class_indices = (true_labels == i)
+			X_rebalanced.extend(X_test[class_indices][:min_count])
+			true_labels_rebalanced.extend(true_labels[class_indices][:min_count])
+			rotated_labels_rebalanced.extend(rotated_labels[class_indices][:min_count])
+
+		X_test, true_labels, rotated_labels = X_rebalanced, true_labels_rebalanced, rotated_labels_rebalanced
+
+	X_test = standardize_data(X_test, mode="B")
 
 	# Testing: Remove this line.
 	for i in range(len(X_test)):
 		X_test[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_test[i, hyper_params["num_cont"]:])
+
+	if balanceGTLabelFlag:
+		assert min(np.unique(true_labels, return_counts=True)[1]) == max(np.unique(true_labels, return_counts=True)[1]), "Ground truth labels not balanced."
 
 	return X_test, true_labels if useRealLabels else rotated_labels

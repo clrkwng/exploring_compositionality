@@ -38,12 +38,6 @@ def get_rep_bool_vecs(arr_size, boolvec_dim, rep_bools):
 	assert len(rep_bools) <= arr_size, "Desired array size is less than the number of rep_bools."
 	assert boolvec_dim + 1 == len(rep_bools), "Mismatch between boolvec_dim and dim of rep_bools."
 
-	# Testing: Remove these lines.
-	# new_rep_bools = []
-	# for i in range(boolvec_dim + 1):
-	# 	new_rep_bools.append(tuple([i * x if x == 1 else -i for i, x in enumerate(rep_bools[i], start=1)]))
-	# rep_bools = new_rep_bools
-
 	# This tries to fit as many multiples of rep_bools into arr_size.
 	bool_vecs = np.tile(rep_bools, ((int)(np.floor(arr_size/(boolvec_dim+1))), 1))
 
@@ -91,8 +85,6 @@ def get_neighbor_bools(rep_bools, boolvec_dim, dist, exclude_train_bools=True):
 	for poss_vec in all_bools:
 		poss_dist = min([hamming_distance(poss_vec, x) for x in rep_bools])
 		if poss_dist == dist:
-			# Testing: Remove this line.
-			# poss_vec = [i * x if x == 1 else -i for i, x in enumerate(poss_vec, start=1)]
 			neighbors.append(poss_vec)
 
 	return neighbors

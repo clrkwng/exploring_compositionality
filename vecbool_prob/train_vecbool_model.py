@@ -19,28 +19,28 @@ from pickle_logic import *
 # Takes in train_size, and val_size. Returns train, validation split.
 def get_train_valid_data(train_size, val_size):
 	X_train, y_train = get_train_data(train_size)
+	print(f"y_train distribution: {np.unique(y_train, return_counts=True)}\n")
 	X_train = torch.tensor(X_train).float().cuda()
 	y_train = torch.tensor(y_train).long().cuda()
-	# print(f"X_train: {X_train}\n")
 
 	train_data = []
 	for i in range(len(X_train)):
 		train_data.append([X_train[i], y_train[i]])
 
 	X_valid, y_valid = get_train_data(val_size)
+	print(f"y_valid distribution: {np.unique(y_valid, return_counts=True)}\n")
 	X_valid = torch.tensor(X_valid).float().cuda()
 	y_valid = torch.tensor(y_valid).long().cuda()
-	# print(f"X_valid: {X_valid}\n")
 
 	return train_data, (X_valid, y_valid)
 
 def train_model(model, trainloader, valid_data, num_batches, train_size, save_path):
+	# Testing: Remove these lines.
+	X_test, y_test = get_test_splitB(5 * 10000, 1)
+	print(f"y_test distribution: {np.unique(y_test, return_counts=True)}\n")
+
 	t = tqdm(range(1, hyper_params["num_epochs"]+1), miniters=100)
 	best_val_acc = 0
-
-	# Testing: Remove these lines.
-	X_test, y_test = get_test_splitB(10000, 1)
-	# print(f"X_test: {X_test}\n")
 
 	X_test = torch.tensor(X_test).float().cuda()
 	y_test = torch.tensor(y_test).long().cuda()
@@ -106,7 +106,7 @@ def train_model(model, trainloader, valid_data, num_batches, train_size, save_pa
 def main():
 	assert torch.cuda.is_available(), "GPU isn't available."
 
-	train_size, valid_size = 40000, 20000
+	train_size, valid_size = 5 * 80000, 5 * 10000
 	train_data, valid_data = get_train_valid_data(train_size, valid_size)
 
 	trainloader = torch.utils.data.DataLoader(dataset=train_data, shuffle=True, batch_size=hyper_params["batch_size"])
@@ -118,7 +118,6 @@ def main():
 
 	save_path = "../saved_model_params/vecbool_model_state_dict.pt"
 	train_model(model, trainloader, valid_data, num_batches, train_size, save_path)
-	save_pickle(cache, "../pickled_files/stats_cache.pickle")
 
 if __name__ == "__main__":
 	main()
