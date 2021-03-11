@@ -15,8 +15,14 @@ cache_path = "../pickled_files/stats_cache.pickle"
 cache_file = Path(cache_path)
 cache = load_pickle(cache_path) if cache_file.is_file() else {}
 
-bools_file = Path("../pickled_files/rep_bools.pickle")
-rep_bools = load_pickle("../pickled_files/rep_bools.pickle") if bools_file.is_file() else gen_bools()
+if rep_bools_len != boolvec_dim + 1:
+	file_path = "../pickled_files/" + str(rep_bools_len) + "_rep_bools.pickle"
+else:
+	file_path = "../pickled_files/rep_bools.pickle"
+rep_bools = load_pickle(file_path) if Path(file_path).is_file() else gen_bools()
+
+test_dist = 1
+neighbor_bools = get_neighbor_bools(rep_bools, boolvec_dim, test_dist)
 
 hyper_params = {
 	"cont_range": [0, 5],
@@ -28,6 +34,8 @@ hyper_params = {
 	"hidden_drop_p": 0.1,
 	"batch_flag": True,
 	"rep_bools": rep_bools,
+	"test_dist": test_dist,
+	"neighbor_bools": neighbor_bools,
 	"lr": 1e-3,
 	"num_epochs": 100,
 	"batch_size": 256
@@ -42,10 +50,14 @@ unrotationExperimentFlag = False
 # Toggle this flag, if balancing ground truth labels.
 balanceGTLabelFlag = True
 
+# Toggle this flag, if switching training and test data sets.
+switchDataSetsFlag = False
+
 test_params = {
   "useRealLabels": useRealLabels,
   "unrotationExperimentFlag": unrotationExperimentFlag,
-  "balanceGTLabelFlag": balanceGTLabelFlag
+  "balanceGTLabelFlag": balanceGTLabelFlag,
+	"switchDataSetsFlag": switchDataSetsFlag
 }
 
 with open('../ssh_keys/comet_api_key.txt', 'r') as file:
@@ -121,9 +133,15 @@ def true_f(g, X):
 	rotated_labels = rotate_class(true_labels, rot_amts, hyper_params["num_classes"])
 	return true_labels, rotated_labels
 
+# Takes a CUDA tensor, returns a numpy.
+def tensor_to_numpy(tnsr):
+	return tnsr.detach().cpu().numpy()
+
 # Returns the number of correct predictions.
-def get_num_correct(preds, labels):
+def get_num_correct(preds, labels, print_preds=False):
 	pred = preds.max(1, keepdim=True)[1]
+	if print_preds:
+		print(f"{np.unique(tensor_to_numpy(pred), return_counts=True)}\n")
 	correct = pred.eq(labels.view_as(pred)).sum().item()
 	return correct
 

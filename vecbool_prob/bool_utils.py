@@ -1,6 +1,7 @@
 import numpy as np
 
 boolvec_dim = 5
+rep_bools_len = boolvec_dim + 1 # Set this to how many rep boolean vectors to use in the train set.
 
 # Returns a weighted sum of value times one-indexed index.
 def get_rotation_amount(bool_vec):
@@ -26,7 +27,18 @@ def get_representative_bools(boolvec_dim):
 		rand_bool = list(bools[np.random.randint(len(bools))]).copy()
 		rand_bool[i] = 1 - rand_bool[i]
 		bools.append(tuple(rand_bool))
-	assert len(np.unique(bools, axis=0)) == boolvec_dim + 1, "Not enough rep bools."
+
+	if len(bools) < rep_bools_len:
+		all_bools = get_all_bitstrings(boolvec_dim)
+		curr_bools = set(bools)
+		for poss_bool in all_bools:
+			if len(bools) == rep_bools_len: break
+			
+			if poss_bool not in curr_bools:
+				curr_bools.add(poss_bool)
+				bools.append(poss_bool)
+
+	assert len(np.unique(bools, axis=0)) == rep_bools_len, "Not enough rep bools."
 	return bools
 
 # Returns row intersection between arr1 and arr2
@@ -36,10 +48,10 @@ def intersect2D(arr1, arr2):
 # Returns arr_size array of representative boolean vectors.
 def get_rep_bool_vecs(arr_size, boolvec_dim, rep_bools):
 	assert len(rep_bools) <= arr_size, "Desired array size is less than the number of rep_bools."
-	assert boolvec_dim + 1 == len(rep_bools), "Mismatch between boolvec_dim and dim of rep_bools."
+	assert rep_bools_len == len(rep_bools), "Mismatch between boolvec_dim and dim of rep_bools."
 
 	# This tries to fit as many multiples of rep_bools into arr_size.
-	bool_vecs = np.tile(rep_bools, ((int)(np.floor(arr_size/(boolvec_dim+1))), 1))
+	bool_vecs = np.tile(rep_bools, ((int)(np.floor(arr_size/(rep_bools_len))), 1))
 
 	# Then for the remaining vectors left, randomly select from rep_bools to fill up the array.
 	if arr_size > len(bool_vecs):
@@ -76,7 +88,7 @@ def get_all_bitstrings(boolvec_dim):
 # exlude_train_bool flag will signal if we want to keep any of the vecs
 # that were in our training data or not.
 def get_neighbor_bools(rep_bools, boolvec_dim, dist, exclude_train_bools=True):
-	assert boolvec_dim + 1 == len(rep_bools), "Mismatch between boolvec_dim and dim of rep_bools."
+	assert rep_bools_len == len(rep_bools), "Mismatch between boolvec_dim and dim of rep_bools."
 	all_bools = get_all_bitstrings(boolvec_dim)
 	neighbors = []
 	if exclude_train_bools:
@@ -91,7 +103,7 @@ def get_neighbor_bools(rep_bools, boolvec_dim, dist, exclude_train_bools=True):
 
 # Returns arr_size array of all boolean vectors, dist away from train_bools
 def get_dist_bool_vecs(arr_size, boolvec_dim, rep_bools, dist, exclude_train_bools=True):
-	assert boolvec_dim + 1 == len(rep_bools), "Mismatch between boolvec_dim and dim of rep_bools."
+	assert rep_bools_len == len(rep_bools), "Mismatch between boolvec_dim and dim of rep_bools."
 
 	neighbor_bools = get_neighbor_bools(rep_bools, boolvec_dim, dist, exclude_train_bools)
 	assert len(neighbor_bools) != 0, "No neighboring boolean vectors!"

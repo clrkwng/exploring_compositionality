@@ -18,7 +18,13 @@ from pickle_logic import *
 
 # Takes in train_size, and val_size. Returns train, validation split.
 def get_train_valid_data(train_size, val_size):
-	X_train, y_train = get_train_data(train_size)
+	if switchDataSetsFlag:
+		X_train, y_train = get_test_splitB(train_size, hyper_params["test_dist"])
+		X_valid, y_valid = get_test_splitB(val_size, hyper_params["test_dist"])
+	else:
+		X_train, y_train = get_train_data(train_size)
+		X_valid, y_valid = get_train_data(val_size)
+
 	print(f"y_train distribution: {np.unique(y_train, return_counts=True)}\n")
 	X_train = torch.tensor(X_train).float().cuda()
 	y_train = torch.tensor(y_train).long().cuda()
@@ -27,7 +33,6 @@ def get_train_valid_data(train_size, val_size):
 	for i in range(len(X_train)):
 		train_data.append([X_train[i], y_train[i]])
 
-	X_valid, y_valid = get_train_data(val_size)
 	print(f"y_valid distribution: {np.unique(y_valid, return_counts=True)}\n")
 	X_valid = torch.tensor(X_valid).float().cuda()
 	y_valid = torch.tensor(y_valid).long().cuda()
@@ -36,7 +41,11 @@ def get_train_valid_data(train_size, val_size):
 
 def train_model(model, trainloader, valid_data, num_batches, train_size, save_path):
 	# Testing: Remove these lines.
-	X_test, y_test = get_test_splitB(5 * 10000, 1)
+	test_size = (5 if balanceGTLabelFlag else 1) * 100000
+	if switchDataSetsFlag:
+		X_test, y_test = get_train_data(test_size)
+	else:
+		X_test, y_test = get_test_splitB(test_size, hyper_params["test_dist"])
 	print(f"y_test distribution: {np.unique(y_test, return_counts=True)}\n")
 
 	t = tqdm(range(1, hyper_params["num_epochs"]+1), miniters=100)
@@ -93,7 +102,7 @@ def train_model(model, trainloader, valid_data, num_batches, train_size, save_pa
 					cont_test = X_test[:, :hyper_params["num_cont"]].float()
 					cat_test = X_test[:, hyper_params["num_cont"]:].long()	
 					test_preds = model(cont_test, cat_test)
-					test_acc = round(get_num_correct(test_preds, y_test)/X_test.shape[0], 6)
+					test_acc = round(get_num_correct(test_preds, y_test, print_preds=False)/X_test.shape[0], 6)
 					experiment.log_metric("accuracy_during_training", test_acc, step=epoch)
 
 			n_epochs = hyper_params["num_epochs"]
@@ -106,7 +115,7 @@ def train_model(model, trainloader, valid_data, num_batches, train_size, save_pa
 def main():
 	assert torch.cuda.is_available(), "GPU isn't available."
 
-	train_size, valid_size = 5 * 80000, 5 * 10000
+	train_size, valid_size = (5 if balanceGTLabelFlag else 1) * 800000, (5 if balanceGTLabelFlag else 1) * 100000
 	train_data, valid_data = get_train_valid_data(train_size, valid_size)
 
 	trainloader = torch.utils.data.DataLoader(dataset=train_data, shuffle=True, batch_size=hyper_params["batch_size"])
