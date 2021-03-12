@@ -41,7 +41,7 @@ def get_train_valid_data(train_size, val_size):
 
 def train_model(model, trainloader, valid_data, num_batches, train_size, save_path):
 	# Testing: Remove these lines.
-	test_size = (5 if balanceGTLabelFlag else 1) * 100000
+	test_size = (5 if balanceGTLabelFlag else 1) * 10000
 	if switchDataSetsFlag:
 		X_test, y_test = get_train_data(test_size)
 	else:
@@ -115,7 +115,7 @@ def train_model(model, trainloader, valid_data, num_batches, train_size, save_pa
 def main():
 	assert torch.cuda.is_available(), "GPU isn't available."
 
-	train_size, valid_size = (5 if balanceGTLabelFlag else 1) * 800000, (5 if balanceGTLabelFlag else 1) * 100000
+	train_size, valid_size = (5 if balanceGTLabelFlag else 1) * 80000, (5 if balanceGTLabelFlag else 1) * 10000
 	train_data, valid_data = get_train_valid_data(train_size, valid_size)
 
 	trainloader = torch.utils.data.DataLoader(dataset=train_data, shuffle=True, batch_size=hyper_params["batch_size"])
