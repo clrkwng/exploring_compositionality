@@ -1,6 +1,6 @@
 import numpy as np
 
-boolvec_dim = 2
+boolvec_dim = 3
 rep_bools_len = boolvec_dim + 1 # Set this to how many rep boolean vectors to use in the train set.
 
 # Returns a weighted sum of value times one-indexed index.

@@ -41,7 +41,7 @@ class WangNet(nn.Module):
 			self.embedder = nn.Embedding(num_embeddings=emb_dims[0], embedding_dim=self.embed_dim)
 
 		# Layers that will scale the continuous data up to embedded categorical data size.
-		self.scale_cont_layers = nn.ModuleList([LBDLayer(num_cont, 8, batch_flag, 0), LBDLayer(8, self.embed_dim * boolvec_dim, batch_flag, 0)]) #, LBDLayer(32, 64, batch_flag, 0), LBDLayer(64, self.embed_dim * boolvec_dim, batch_flag, 0)])
+		self.scale_cont_layers = nn.ModuleList([LBDLayer(num_cont, 8, batch_flag, 0), LBDLayer(8, 32, batch_flag, 0), LBDLayer(32, 64, batch_flag, 0), LBDLayer(64, self.embed_dim * boolvec_dim, batch_flag, 0)])
 		# Shouldn't use dropout on the input layer.
 		# The flattened embedded size for each boolean vector is now embed_dim * boolvec_dim
 		# Also, the continuous data has been scaled up to match categorical input size.

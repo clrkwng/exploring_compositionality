@@ -26,10 +26,10 @@ neighbor_bools = get_neighbor_bools(rep_bools, boolvec_dim, test_dist)
 
 hyper_params = {
 	"cont_range": [0, 5],
-	"boolvec_dim": boolvec_dim, # boolvec_dim is defined in gen_rep_bools.py.
+	"boolvec_dim": boolvec_dim, # boolvec_dim is defined in bool_utils.py.
 	"emb_dims": [2 * boolvec_dim, 4 * boolvec_dim],
 	"num_cont": 2,
-	"lin_layer_sizes": [128, 512, 1024, 800, 512, 128, 32, 20],
+	"lin_layer_sizes": [128, 512, 128, 32],
 	"num_classes": 10,
 	"hidden_drop_p": 0.1,
 	"batch_flag": True,
@@ -53,17 +53,24 @@ balanceGTLabelFlag = True
 # Toggle this flag, if switching training and test data sets.
 switchDataSetsFlag = False
 
+# Toggle this flag, if converting the boolean vector to take into account (position, value).
+convertBooleanFlag = True
+
+# Toggle this flag if shuffling the data in true_g method.
+shuffleFlag = True
+
 test_params = {
   "useRealLabels": useRealLabels,
   "unrotationExperimentFlag": unrotationExperimentFlag,
   "balanceGTLabelFlag": balanceGTLabelFlag,
-	"switchDataSetsFlag": switchDataSetsFlag
+	"switchDataSetsFlag": switchDataSetsFlag,
+	"convertBooleanFlag": convertBooleanFlag
 }
 
 with open('../ssh_keys/comet_api_key.txt', 'r') as file:
 	comet_key = file.read().replace('\n', '')
 
-experiment = Experiment(api_key=comet_key, project_name="vecbool", workspace="clrkwng")
+experiment = Experiment(api_key=comet_key, project_name="vecbool_report", workspace="clrkwng")
 experiment.log_parameters(hyper_params)
 experiment.log_parameters(test_params)
 
@@ -82,6 +89,21 @@ def save_plot(xvalues, yvalues, xlabel, ylabel, title, file_name, fn):
 	plt.savefig("images/" + file_name)
 	plt.clf()
 
+# Save 3D plot.
+def save_3D_plot(x_vals, y_vals, z_vals, file_name, x_label, y_label, z_label):
+	ax = plt.axes(projection='3d')
+	ax.scatter3D(x_vals, y_vals, z_vals, c=y_vals)
+	for x, y, z in zip(x_vals, y_vals, z_vals):
+		label = "  " + str(int(x)) + ", " + str(int(z))
+		ax.text(x, y, z, '%s' % label, size=7, zorder=1, color='k')
+	ax.set_xlabel(x_label)
+	ax.set_ylabel(y_label)
+	ax.set_zlabel(z_label)
+	xx, yy = np.meshgrid(range(10), range(10))
+	ax.plot_surface(xx, yy, xx, alpha=0.2)
+	plt.savefig("images/" + file_name)
+	plt.clf()
+
 # Standardize the data (subtract mean, divide by std).
 # Will use training data's mean and std for both train and test data.
 def standardize_data(X_orig, mode="test"):
@@ -92,16 +114,18 @@ def standardize_data(X_orig, mode="test"):
 	if mode == "train":
 		X_mean = np.mean(X[:, :hyper_params["num_cont"]], axis=0)
 		X_std = np.std(X[:, :hyper_params["num_cont"]], axis=0)
+		X[:, :hyper_params["num_cont"]] -= X_mean
+		X[:, :hyper_params["num_cont"]] /= X_std
 		cache["X_train_mean"] = X_mean
 		cache["X_train_std"] = X_std
-		print(cache)
 		save_pickle(cache, "../pickled_files/stats_cache.pickle")
 
-	assert "X_train_mean" in cache and "X_train_std" in cache,\
-		"Train data statistics have not been cached yet."
+	else:
+		assert "X_train_mean" in cache and "X_train_std" in cache,\
+			"Train data statistics have not been cached yet."
 			
-	X[:, :hyper_params["num_cont"]] -= cache["X_train_mean"]
-	X[:, :hyper_params["num_cont"]] /= cache["X_train_std"]
+		X[:, :hyper_params["num_cont"]] -= cache["X_train_mean"]
+		X[:, :hyper_params["num_cont"]] /= cache["X_train_std"]
 
 	return X
 
@@ -132,9 +156,15 @@ def true_g(X):
 			X_rebalanced.extend(X[class_indices][:min_count])
 			true_labels_rebalanced.extend(true_labels[class_indices][:min_count])
 
-		X, true_labels = X_rebalanced, true_labels_rebalanced		
+		X, true_labels = X_rebalanced, true_labels_rebalanced
 
-	return X, true_labels
+	# Shuffle X, true_labels together so that the classes aren't in the same order.
+	if shuffleFlag:
+		tmp = list(zip(X, true_labels))
+		np.random.shuffle(tmp)
+		X, true_labels = zip(*tmp)		
+
+	return list(X), list(true_labels)
 
 # Given true_labels, and each x in X has continuous and categorical data.
 def true_f(true_labels, X):
@@ -147,11 +177,15 @@ def tensor_to_numpy(tnsr):
 	return tnsr.detach().cpu().numpy()
 
 # Returns the number of correct predictions.
-def get_num_correct(preds, labels, print_preds=False):
+# Parameter k is used for weaker accuracy, i.e. if k = 1, we also count classes +- 1 as correct.
+def get_num_correct(preds, labels, k=0, print_preds=False):
 	pred = preds.max(1, keepdim=True)[1]
 	if print_preds:
 		print(f"{np.unique(tensor_to_numpy(pred), return_counts=True)}\n")
 	correct = pred.eq(labels.view_as(pred)).sum().item()
+	for i in range(1, k + 1):
+		correct += pred.eq((labels.view_as(pred) + 1) % 10).sum().item()
+		correct += pred.eq((labels.view_as(pred) - 1) % 10).sum().item()
 	return correct
 
 def get_train_data(train_size):
@@ -167,15 +201,17 @@ def get_train_data(train_size):
 	X_train = standardize_data(X_train, mode="train")
 
 	# Testing: Remove this line.
-	for i in range(len(X_train)):
-		X_train[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_train[i, hyper_params["num_cont"]:])
+	if convertBooleanFlag:
+		for i in range(len(X_train)):
+			X_train[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_train[i, hyper_params["num_cont"]:])
 	
 	if balanceGTLabelFlag:
 		assert min(np.unique(true_labels, return_counts=True)[1]) == max(np.unique(true_labels, return_counts=True)[1]), "Ground truth labels not balanced."
 
-	return X_train, true_labels if useRealLabels else rotated_labels
+	return X_train, true_labels, rotated_labels
 
 # This test distribution is the same as the training distribution.
+# I use this method to get the validation data.
 def get_test_splitA(test_size, *unused):
 	global cache
 
@@ -189,13 +225,14 @@ def get_test_splitA(test_size, *unused):
 	X_test = standardize_data(X_test)
 
 	# Testing: Remove this line.
-	for i in range(len(X_test)):
-		X_test[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_test[i, hyper_params["num_cont"]:])
+	if convertBooleanFlag:
+		for i in range(len(X_test)):
+			X_test[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_test[i, hyper_params["num_cont"]:])
 	
 	if balanceGTLabelFlag:
 		assert min(np.unique(true_labels, return_counts=True)[1]) == max(np.unique(true_labels, return_counts=True)[1]), "Ground truth labels not balanced."
 
-	return X_test, true_labels if useRealLabels else rotated_labels
+	return X_test, true_labels, rotated_labels
 
 # This test distribution tests compositionality.
 def get_test_splitB(test_size, test_dist):
@@ -218,10 +255,11 @@ def get_test_splitB(test_size, test_dist):
 	X_test = standardize_data(X_test)
 
 	# Testing: Remove this line.
-	for i in range(len(X_test)):
-		X_test[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_test[i, hyper_params["num_cont"]:])
+	if convertBooleanFlag:
+		for i in range(len(X_test)):
+			X_test[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_test[i, hyper_params["num_cont"]:])
 	
 	if balanceGTLabelFlag:
 		assert min(np.unique(true_labels, return_counts=True)[1]) == max(np.unique(true_labels, return_counts=True)[1]), "Ground truth labels not balanced."
 
-	return X_test, true_labels if useRealLabels else rotated_labels
+	return X_test, true_labels, rotated_labels
