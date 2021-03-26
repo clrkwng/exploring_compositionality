@@ -188,6 +188,12 @@ def get_num_correct(preds, labels, k=0, print_preds=False):
 		correct += pred.eq((labels.view_as(pred) - 1) % 10).sum().item()
 	return correct
 
+# Instead of rotating labels by adding, use multiplication.
+def random_f(true_labels, X):
+	mult_amts = get_rotation_amount(X[:, hyper_params["num_cont"]:].T)
+	rotated_labels = mod_mult(true_labels, mult_amts, hyper_params["num_classes"])
+	return rotated_labels
+
 def get_train_data(train_size):
 	global cache
 
@@ -244,7 +250,7 @@ def get_test_splitB(test_size, test_dist):
 
 	X_02 = get_dist_bool_vecs(len(X_01), hyper_params["boolvec_dim"], hyper_params["rep_bools"], test_dist)
 	X_test = np.concatenate((X_01, X_02), axis=1)
-	rotated_labels = true_f(true_labels, X_test)
+	rotated_labels = random_f(true_labels, X_test)
 
 	if unrotationExperimentFlag:
 		matching_indices = (true_labels == rotated_labels)

@@ -15,6 +15,13 @@ def rotate_class(classes, rot_amts, num_classes):
 
 	return (classes + rot_amts) % num_classes
 
+# Given classes and multiplication amount, multiply each class by that amount under mod num_classes.
+def mod_mult(classes, mult_amts, num_classes):
+	assert max(classes) < num_classes and min(classes) >= 0, "Classes are out of range."
+	assert len(mult_amts) == len(classes), "Classes and mult_amts need to be same length."
+
+	return (classes * mult_amts) % num_classes
+
 # Return an array of random boolean vectors, where each row is a boolean vector.
 def get_rand_bool_vecs(arr_size, boolvec_dim):
 	return np.random.randint(2, size=(arr_size, boolvec_dim))
