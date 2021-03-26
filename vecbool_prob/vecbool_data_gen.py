@@ -59,6 +59,12 @@ convertBooleanFlag = True
 # Toggle this flag if shuffling the data in true_g method.
 shuffleFlag = True
 
+# Toggle this flag if using random_f for the test data.
+random_flag = False
+
+# Toggle this flag if using bitstring interpretation of boolvec.
+bitstring_flag = True
+
 test_params = {
   "useRealLabels": useRealLabels,
   "unrotationExperimentFlag": unrotationExperimentFlag,
@@ -168,7 +174,10 @@ def true_g(X):
 
 # Given true_labels, and each x in X has continuous and categorical data.
 def true_f(true_labels, X):
-	rot_amts = get_rotation_amount(X[:, hyper_params["num_cont"]:].T)
+	if not bitstring_flag:
+		rot_amts = get_rotation_amount(X[:, hyper_params["num_cont"]:].T)
+	else:
+		rot_amts = bool_to_dec(X[:, hyper_params["num_cont"]:].T)
 	rotated_labels = rotate_class(true_labels, rot_amts, hyper_params["num_classes"])
 	return rotated_labels
 
@@ -190,7 +199,10 @@ def get_num_correct(preds, labels, k=0, print_preds=False):
 
 # Instead of rotating labels by adding, use multiplication.
 def random_f(true_labels, X):
-	mult_amts = get_rotation_amount(X[:, hyper_params["num_cont"]:].T)
+	if not bitstring_flag:
+		mult_amts = get_rotation_amount(X[:, hyper_params["num_cont"]:].T)
+	else:
+		mult_amts = bool_to_dec(X[:, hyper_params["num_cont"]:].T)
 	rotated_labels = mod_mult(true_labels, mult_amts, hyper_params["num_classes"])
 	return rotated_labels
 
@@ -250,7 +262,12 @@ def get_test_splitB(test_size, test_dist):
 
 	X_02 = get_dist_bool_vecs(len(X_01), hyper_params["boolvec_dim"], hyper_params["rep_bools"], test_dist)
 	X_test = np.concatenate((X_01, X_02), axis=1)
-	rotated_labels = random_f(true_labels, X_test)
+
+	# Change the fn call here, depending on if using random_f or true_f.
+	if not random_flag:
+		rotated_labels = true_f(true_labels, X_test)
+	else:
+		rotated_labels = random_f(true_labels, X_test)
 
 	if unrotationExperimentFlag:
 		matching_indices = (true_labels == rotated_labels)

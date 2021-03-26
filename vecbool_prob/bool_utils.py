@@ -8,6 +8,11 @@ def get_rotation_amount(bool_vec):
 	rot_amt = sum([i * val for i, val in enumerate(bool_vec, start=1)])
 	return rot_amt
 
+# Returns the decimal interpretation of the boolean vector.
+def bool_to_dec(bool_vec):
+	dec_val = sum([(2**i) * val for i, val in enumerate(bool_vec)])
+	return dec_val
+
 # Given classes and rotation amount, rotate class under mod num_classes.
 def rotate_class(classes, rot_amts, num_classes):
 	assert max(classes) < num_classes and min(classes) >= 0, "Classes are out of range."
