@@ -39,8 +39,9 @@ def calc_true_offsets(true_labels_B_y, true_labels_B_x):
 	return [int(x) for x in np.unique(poss_offsets)]
 
 # Generate the heatmaps, given the already generated continuous data, model, and true_labels.
-def gen_heatmap(cont_data, model, true_labels):
-	for B_y in hyper_params["neighbor_bools"]:
+def gen_heatmap(cont_data, model, true_labels, test_dist):
+	neighbor_bools = get_neighbor_bools(hyper_params["rep_bools"], hyper_params["boolvec_dim"], test_dist)
+	for B_y in neighbor_bools:
 		x_vals = []
 		y_vals = []
 
@@ -90,9 +91,9 @@ def gen_heatmap(cont_data, model, true_labels):
 			[convert_boolvec_to_str(vec) for vec in hyper_params["rep_bools"]])
 		plt.yticks(list(range(-9, 11)), list(range(-9, 11)))
 		plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
-		plt.title(f"Heatmap for: {convert_boolvec_to_str(B_y)}")
+		plt.title(f"Heatmap for: {convert_boolvec_to_str(B_y)}_{test_dist}")
 		plt.tight_layout()
-		plt.savefig(f"heatmaps/heatmap{convert_boolvec_to_str(B_y)}.png")
+		plt.savefig(f"heatmaps/heatmap{convert_boolvec_to_str(B_y)}_{test_dist}.png")
 
 def main():
 	model = WangNet(boolvec_dim=hyper_params["boolvec_dim"], emb_dims=hyper_params["emb_dims"], num_cont=hyper_params["num_cont"], \
@@ -103,7 +104,16 @@ def main():
 
 	cont_data, true_labels = get_cont_data(10000)
 
-	gen_heatmap(cont_data, model, true_labels)
+	max_num_flips = 1
+	while True:
+		nbr_bools = get_neighbor_bools(rep_bools, boolvec_dim, max_num_flips)
+		if len(nbr_bools) == 0:
+			break
+		max_num_flips += 1
+		print(max_num_flips)
+
+	for test_dist in range(1, max_num_flips):
+		gen_heatmap(cont_data, model, true_labels, test_dist)
 
 if __name__ == "__main__":
 	main()
