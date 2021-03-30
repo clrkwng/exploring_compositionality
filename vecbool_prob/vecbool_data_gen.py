@@ -21,6 +21,7 @@ else:
 	file_path = "../pickled_files/rep_bools.pickle"
 rep_bools = load_pickle(file_path) if Path(file_path).is_file() else gen_bools()
 
+# This test_dist is used for the testing accuracy, which is looked at during training.
 test_dist = 1
 neighbor_bools = get_neighbor_bools(rep_bools, boolvec_dim, test_dist)
 
@@ -258,7 +259,6 @@ def get_test_splitA(test_size, *unused):
 
 # This test distribution tests compositionality.
 def get_test_splitB(test_size, test_dist):
-
 	global cache
 
 	X_01 = np.random.uniform(hyper_params["cont_range"][0], hyper_params["cont_range"][1], size=(test_size, hyper_params["num_cont"]))
