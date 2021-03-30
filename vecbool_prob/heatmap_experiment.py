@@ -1,4 +1,5 @@
 from comet_ml import Experiment
+from itertools import islice
 import torch
 
 import sys
@@ -38,6 +39,23 @@ def calc_true_offsets(true_labels_B_y, true_labels_B_x):
 	poss_offsets = true_labels_B_y - true_labels_B_x
 	return [int(x) for x in np.unique(poss_offsets)]
 
+# Returns the heatmap needed for plt.imshow.
+def get_heatmap_arr(x_vals, y_vals):
+	y_vals = [y + 9 for y in y_vals]
+	iter_arr = iter(y_vals)
+	output = [list(islice(iter_arr, elem)) for elem in [len(x_vals) // 6] * 6]
+	
+	heatmap = []
+	for lst in output:
+		lst = np.asarray(lst)
+		tmp_lst = [0] * (2 * hyper_params["num_classes"] - 1)
+		unique_cts = np.unique(lst, return_counts=True)
+		for val, count in zip(unique_cts[0], unique_cts[1]):
+			tmp_lst[val] = count
+		heatmap.append(tmp_lst)
+	
+	return np.asarray(heatmap)
+
 # Generate the heatmaps, given the already generated continuous data, model, and true_labels.
 def gen_heatmap(cont_data, model, true_labels, test_dist):
 	neighbor_bools = get_neighbor_bools(hyper_params["rep_bools"], hyper_params["boolvec_dim"], test_dist)
@@ -73,8 +91,9 @@ def gen_heatmap(cont_data, model, true_labels, test_dist):
 			x_vals.extend([i] * len(offsets))
 			y_vals.extend(offsets.reshape((-1,)).tolist())
 		
-		heatmap, xedges, yedges = np.histogram2d(x_vals, y_vals, bins=[5,19])
-		extent = [xedges[0], xedges[-1], yedges[0], 10]
+		# Generating the heatmap, and hardcoding the extent of the heatmap plot.
+		heatmap = get_heatmap_arr(x_vals, y_vals)
+		extent = [0, 6, -9, 10]
 
 		plt.clf()
 		fig, ax = plt.subplots()
@@ -85,7 +104,7 @@ def gen_heatmap(cont_data, model, true_labels, test_dist):
 		for i, B_x in enumerate(hyper_params["rep_bools"]):
 			legend += convert_boolvec_to_str(B_x) + ": " + str(correct_map[i]) + "%, " + str(true_offset_map[i])
 			legend += "\n"
-		plt.text(-10, -2, legend)
+		plt.text(-10, -3, legend)
 
 		plt.xticks(list(range(len(hyper_params["rep_bools"]))), \
 			[convert_boolvec_to_str(vec) for vec in hyper_params["rep_bools"]])
@@ -94,6 +113,7 @@ def gen_heatmap(cont_data, model, true_labels, test_dist):
 		plt.title(f"Heatmap for: {convert_boolvec_to_str(B_y)}_{test_dist}")
 		plt.tight_layout()
 		plt.savefig(f"heatmaps/heatmap{convert_boolvec_to_str(B_y)}_{test_dist}.png")
+		plt.close()
 
 def main():
 	model = WangNet(boolvec_dim=hyper_params["boolvec_dim"], emb_dims=hyper_params["emb_dims"], num_cont=hyper_params["num_cont"], \

@@ -9,6 +9,7 @@ def get_rotation_amount(bool_vec):
 	return rot_amt
 
 # Returns the decimal interpretation of the boolean vector.
+# This is only used on boolean vectors, and not 3 symbol vectors.
 def bool_to_dec(bool_vec):
 	dec_val = sum([(2**i) * val for i, val in enumerate(bool_vec)])
 	return dec_val
@@ -31,7 +32,7 @@ def mod_mult(classes, mult_amts, num_classes):
 def get_rand_bool_vecs(arr_size, boolvec_dim):
 	return np.random.randint(2, size=(arr_size, boolvec_dim))
 
-# Returns D + 1 boolean vectors, where each vector is 1 flip away from at least one other vector.
+# Returns rep_bools_len boolean vectors, where each vector is 1 flip away from at least one other vector.
 # This provides enough boolean vectors to understand what each bit is doing for the data.
 def get_representative_bools(boolvec_dim):
 	bools = [tuple(np.random.randint(2, size=boolvec_dim).tolist())]

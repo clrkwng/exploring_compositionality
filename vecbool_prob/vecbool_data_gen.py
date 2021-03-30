@@ -1,5 +1,8 @@
 from comet_ml import Experiment
 
+import torch
+import torch.nn as nn
+
 import numpy as np
 import sys
 from bool_utils import *
@@ -176,6 +179,46 @@ def true_g(X):
 		X, true_labels = zip(*tmp)		
 
 	return list(X), list(true_labels)
+
+# Used in conjunction with a sequential model, in order to draw the weights from a standard normal dist.
+def init_weights(m):
+	if type(m) == nn.Linear:
+		nn.init.normal_(m.weight, mean=0, std=1.0)
+
+# g : R^2 -> {0, 1, ..., num_classes - 1}.
+# Here, each x in X is in R^2.
+# The fn here is just an arbitrary MLP.
+def arbitrary_g(X):
+	# Either loading the random MLP, or initializing it.
+	model = nn.Sequential(
+					nn.Linear(2, 16),
+					nn.ReLU(),
+					# nn.Dropout(0.2),
+					nn.Linear(16, 32),
+					nn.ReLU(),
+					# nn.Dropout(0.2),
+					# nn.Linear(128, 32),
+					# nn.ReLU(),
+					# nn.Dropout(0.2),
+					nn.Linear(32, 10),
+					nn.Softmax()
+				).cuda()
+
+	# model_path = "../saved_model_params/rand_model_state_dict.pt"
+	# model_file = Path(model_path)
+	# if model_file.is_file():
+	# 	model.load_state_dict(torch.load(model_path))
+	# else:
+	# 	model.apply(init_weights)
+	# 	torch.save(model.state_dict(), model_path)
+	model.eval()
+	with torch.no_grad():
+		X_tensor = torch.tensor(X).float().cuda()
+		preds = model(X_tensor)
+		# preds = tensor_to_numpy(preds.max(1)[1]).tolist()
+
+	return X, preds
+
 
 # Given true_labels, and each x in X has continuous and categorical data.
 def true_f(true_labels, X):
