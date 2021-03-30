@@ -122,7 +122,6 @@ def main():
 	train_data, valid_data = get_train_valid_data(train_size, valid_size)
 
 	trainloader = torch.utils.data.DataLoader(dataset=train_data, shuffle=True, batch_size=hyper_params["batch_size"])
-	print(len(trainloader))
 	num_batches = math.ceil(1.0 * train_size / hyper_params["batch_size"])
 
 	model = WangNet(boolvec_dim=hyper_params["boolvec_dim"], emb_dims=hyper_params["emb_dims"], num_cont=hyper_params["num_cont"], \

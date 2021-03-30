@@ -63,7 +63,7 @@ shuffleFlag = True
 random_flag = False
 
 # Toggle this flag if using bitstring interpretation of boolvec.
-bitstring_flag = True
+bitstring_flag = False
 
 test_params = {
   "useRealLabels": useRealLabels,
@@ -73,12 +73,16 @@ test_params = {
 	"convertBooleanFlag": convertBooleanFlag
 }
 
-with open('../ssh_keys/comet_api_key.txt', 'r') as file:
-	comet_key = file.read().replace('\n', '')
+# Toggle this flag if logging the experiment information in comet.ml, or not.
+log_experiment_flag = True
 
-experiment = Experiment(api_key=comet_key, project_name="vecbool_report", workspace="clrkwng")
-experiment.log_parameters(hyper_params)
-experiment.log_parameters(test_params)
+if log_experiment_flag:
+	with open('../ssh_keys/comet_api_key.txt', 'r') as file:
+		comet_key = file.read().replace('\n', '')
+
+	experiment = Experiment(api_key=comet_key, project_name="vecbool_report", workspace="clrkwng")
+	experiment.log_parameters(hyper_params)
+	experiment.log_parameters(test_params)
 
 # Save a plot, with the following parameters. yvalues needs to be passed in as a list.
 def save_plot(xvalues, yvalues, xlabel, ylabel, title, file_name, fn):
@@ -264,10 +268,10 @@ def get_test_splitB(test_size, test_dist):
 	X_test = np.concatenate((X_01, X_02), axis=1)
 
 	# Change the fn call here, depending on if using random_f or true_f.
-	if not random_flag:
-		rotated_labels = true_f(true_labels, X_test)
-	else:
+	if random_flag:
 		rotated_labels = random_f(true_labels, X_test)
+	else:
+		rotated_labels = true_f(true_labels, X_test)
 
 	if unrotationExperimentFlag:
 		matching_indices = (true_labels == rotated_labels)

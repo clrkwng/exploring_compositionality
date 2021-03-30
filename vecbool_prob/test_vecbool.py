@@ -32,6 +32,10 @@ def get_testing_data(test_size, test_split_fn, test_dist):
 def test_model(model, cont_X_test, cat_X_test, y_true, y_test, num):
 	model.eval()
 	with torch.no_grad():
+		print(cont_X_test)
+		print(cat_X_test)
+		print("\n")
+
 		preds = model(cont_X_test, cat_X_test)
 		test_acc = get_num_correct(preds, y_test, k=0) / len(y_test)
 		preds = preds.max(1, keepdim=True)[1]
@@ -70,8 +74,7 @@ def main():
 	label_tuples = []
 	for test_dist in range(1, max_num_flips):
 		for i in range(10):
-			cont_x, cat_x, y_true, y_test = get_testing_data(test_size, get_test_splitB, test_dist)
-
+			cont_x, cat_x, y_true, y_test = get_testing_data(test_size, get_test_splitA, test_dist)
 			# This code only keeps testing data where the ground truth label matches rotated label.
 			# matching_indices = ((y_test == true_labels).nonzero(as_tuple=True)[0])
 			# if len(matching_indices) != 0:

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 """
-LBDLayer: Linear+ReLU -> Batchnorm -> Dropout layer
+LBDLayer: Linear+LeakyReLU -> Batchnorm -> Dropout layer
 Takes in layer input_size and output_size
 batch_flag is True if using batchnorm, else False
 drop_p denotes dropout probability

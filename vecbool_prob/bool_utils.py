@@ -60,10 +60,10 @@ def intersect2D(arr1, arr2):
 # Returns arr_size array of representative boolean vectors.
 def get_rep_bool_vecs(arr_size, boolvec_dim, rep_bools):
 	assert len(rep_bools) <= arr_size, "Desired array size is less than the number of rep_bools."
-	assert rep_bools_len == len(rep_bools), "Mismatch between boolvec_dim and dim of rep_bools."
+	# assert rep_bools_len == len(rep_bools), "Mismatch between boolvec_dim and dim of rep_bools."
 
 	# This tries to fit as many multiples of rep_bools into arr_size.
-	bool_vecs = np.tile(rep_bools, ((int)(np.floor(arr_size/(rep_bools_len))), 1))
+	bool_vecs = np.tile(rep_bools, ((int)(np.floor(arr_size/(len(rep_bools)))), 1))
 
 	# Then for the remaining vectors left, randomly select from rep_bools to fill up the array.
 	if arr_size > len(bool_vecs):
@@ -141,3 +141,10 @@ def get_dist_bool_vecs(arr_size, boolvec_dim, rep_bools, dist, exclude_train_boo
 def convert_boolvec_to_position_vec(boolvec):
 	assert max(boolvec) <=1 and min(boolvec) >= 0, "boolvec isn't a boolean vector."
 	return [i if x == 1 else i + boolvec_dim for i, x in enumerate(boolvec, start=0)]
+
+# Converts the boolean vector into a bitstring string.
+def convert_boolvec_to_str(boolvec):
+	bitstr = ""
+	for bit in boolvec:
+		bitstr = bitstr + str(bit)
+	return bitstr
