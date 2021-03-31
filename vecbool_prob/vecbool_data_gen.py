@@ -70,6 +70,9 @@ random_flag = False
 # Toggle this flag if using bitstring interpretation of boolvec.
 bitstring_flag = False
 
+# Toggle this flag if using an arbitrary nn as the underlying g fn.
+arbitrary_fn_flag = True
+
 test_params = {
   "useRealLabels": useRealLabels,
   "unrotationExperimentFlag": unrotationExperimentFlag,
@@ -182,10 +185,36 @@ def true_g(X):
 
 	return list(X), list(true_labels)
 
-# Used in conjunction with a sequential model, in order to draw the weights from a standard normal dist.
-def init_weights(m):
-	if type(m) == nn.Linear:
-		nn.init.normal_(m.weight, mean=0, std=1.0)
+# Artificially choosing class in a balanced manner.
+def arb_class_helper(val):
+	val = val * 1000
+	if 31 <= val <= 34:
+		return 0
+	elif 34 <= val <= 36.5:
+		return 1
+	elif 36.5 <= val <= 38:
+		return 2
+	elif 38 <= val <= 39.1:
+		return 3
+	elif 39.1 <= val <= 39.9:
+		return 4
+	elif 39.9 <= val <= 41.5:
+		return 5
+	elif 41.5 <= val <= 43:
+		return 6
+	elif 43 <= val <= 44:
+		return 7
+	elif 44 <= val <= 47:
+		return 8
+	else:
+		return 9
+
+def return_arb_classes(preds):
+	lsts = tensor_to_numpy(preds).tolist()
+	diffs = []
+	for lst in lsts:
+		diffs.append(max(lst) - min(lst))
+	return [arb_class_helper(d) for d in diffs]
 
 # g : R^2 -> {0, 1, ..., num_classes - 1}.
 # Here, each x in X is in R^2.
@@ -195,33 +224,29 @@ def arbitrary_g(X):
 	model = nn.Sequential(
 					nn.Linear(2, 16),
 					nn.ReLU(),
-					# nn.Dropout(0.2),
 					nn.Linear(16, 32),
 					nn.ReLU(),
-					# nn.Dropout(0.2),
-					# nn.Linear(128, 32),
-					# nn.ReLU(),
-					# nn.Dropout(0.2),
 					nn.Linear(32, 10),
 					nn.Softmax()
 				).cuda()
 
-	# model_path = "../saved_model_params/rand_model_state_dict.pt"
-	# model_file = Path(model_path)
-	# if model_file.is_file():
-	# 	model.load_state_dict(torch.load(model_path))
-	# else:
-	# 	model.apply(init_weights)
-	# 	torch.save(model.state_dict(), model_path)
-	model.apply(init_weights)
-	X = standardize_data(X, mode="train", save_stats=False)
+	model_path = "../saved_model_params/rand_model_state_dict.pt"
+	model_file = Path(model_path)
+	if model_file.is_file():
+		model.load_state_dict(torch.load(model_path))
+	else:
+		torch.save(model.state_dict(), model_path)
+
+	X_standardized = standardize_data(X, mode="train", save_stats=False)
 	model.eval()
 	with torch.no_grad():
-		X_tensor = torch.tensor(X).float().cuda()
+		X_tensor = torch.tensor(X_standardized).float().cuda()
 		preds = model(X_tensor)
-		preds = tensor_to_numpy(preds.max(1)[1]).tolist()
+		# preds = tensor_to_numpy(preds.max(1)[1]).tolist()
 
-	return X, preds
+	X_arr = [np.asarray(x_lst) for x_lst in X]
+
+	return X_arr, return_arb_classes(preds)
 
 
 # Given true_labels, and each x in X has continuous and categorical data.
@@ -262,7 +287,10 @@ def get_train_data(train_size):
 	global cache
 
 	X_01 = np.random.uniform(hyper_params["cont_range"][0], hyper_params["cont_range"][1], size=(train_size, hyper_params["num_cont"]))
-	X_01, true_labels = true_g(X_01)
+	if arbitrary_fn_flag:
+		X_01, true_labels = arbitrary_g(X_01)
+	else:
+		X_01, true_labels = true_g(X_01)
 
 	X_02 = get_rep_bool_vecs(len(X_01), hyper_params["boolvec_dim"], hyper_params["rep_bools"])
 	X_train = np.concatenate((X_01, X_02), axis=1)
@@ -275,7 +303,7 @@ def get_train_data(train_size):
 		for i in range(len(X_train)):
 			X_train[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_train[i, hyper_params["num_cont"]:])
 	
-	if balanceGTLabelFlag:
+	if balanceGTLabelFlag and not arbitrary_fn_flag:
 		assert min(np.unique(true_labels, return_counts=True)[1]) == max(np.unique(true_labels, return_counts=True)[1]), "Ground truth labels not balanced."
 
 	return X_train, true_labels, rotated_labels
@@ -286,7 +314,10 @@ def get_test_splitA(test_size, *unused):
 	global cache
 
 	X_01 = np.random.uniform(hyper_params["cont_range"][0], hyper_params["cont_range"][1], size=(test_size, hyper_params["num_cont"]))
-	X_01, true_labels = true_g(X_01)
+	if arbitrary_fn_flag:
+		X_01, true_labels = arbitrary_g(X_01)
+	else:
+		X_01, true_labels = true_g(X_01)
 
 	X_02 = get_rep_bool_vecs(len(X_01), hyper_params["boolvec_dim"], hyper_params["rep_bools"])
 	X_test = np.concatenate((X_01, X_02), axis=1)
@@ -299,7 +330,7 @@ def get_test_splitA(test_size, *unused):
 		for i in range(len(X_test)):
 			X_test[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_test[i, hyper_params["num_cont"]:])
 	
-	if balanceGTLabelFlag:
+	if balanceGTLabelFlag and not arbitrary_fn_flag:
 		assert min(np.unique(true_labels, return_counts=True)[1]) == max(np.unique(true_labels, return_counts=True)[1]), "Ground truth labels not balanced."
 
 	return X_test, true_labels, rotated_labels
@@ -309,7 +340,10 @@ def get_test_splitB(test_size, test_dist):
 	global cache
 
 	X_01 = np.random.uniform(hyper_params["cont_range"][0], hyper_params["cont_range"][1], size=(test_size, hyper_params["num_cont"]))
-	X_01, true_labels = true_g(X_01)
+	if arbitrary_fn_flag:
+		X_01, true_labels = arbitrary_g(X_01)
+	else:
+		X_01, true_labels = true_g(X_01)
 
 	X_02 = get_dist_bool_vecs(len(X_01), hyper_params["boolvec_dim"], hyper_params["rep_bools"], test_dist)
 	X_test = np.concatenate((X_01, X_02), axis=1)
@@ -333,7 +367,7 @@ def get_test_splitB(test_size, test_dist):
 		for i in range(len(X_test)):
 			X_test[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_test[i, hyper_params["num_cont"]:])
 	
-	if balanceGTLabelFlag:
+	if balanceGTLabelFlag and not arbitrary_fn_flag:
 		assert min(np.unique(true_labels, return_counts=True)[1]) == max(np.unique(true_labels, return_counts=True)[1]), "Ground truth labels not balanced."
 
 	return X_test, true_labels, rotated_labels

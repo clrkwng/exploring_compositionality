@@ -1,8 +1,8 @@
 import numpy as np
 from itertools import permutations
 
-boolvec_dim = 3
-num_symbols = 3
+boolvec_dim = 5
+num_symbols = 2
 rep_bools_len = (num_symbols - 1) * boolvec_dim + 1 # Set this to how many rep boolean vectors to use in the train set.
 
 # Returns a weighted sum of value times one-indexed index.
