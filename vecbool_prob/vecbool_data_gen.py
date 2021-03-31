@@ -18,7 +18,7 @@ cache_path = "../pickled_files/stats_cache.pickle"
 cache_file = Path(cache_path)
 cache = load_pickle(cache_path) if cache_file.is_file() else {}
 
-if rep_bools_len != boolvec_dim + 1:
+if rep_bools_len != (num_symbols - 1) * boolvec_dim + 1:
 	file_path = "../pickled_files/" + str(rep_bools_len) + "_rep_bools.pickle"
 else:
 	file_path = "../pickled_files/rep_bools.pickle"
@@ -31,7 +31,7 @@ neighbor_bools = get_neighbor_bools(rep_bools, boolvec_dim, test_dist)
 hyper_params = {
 	"cont_range": [0, 5],
 	"boolvec_dim": boolvec_dim, # boolvec_dim is defined in bool_utils.py.
-	"emb_dims": [2 * boolvec_dim, 4 * boolvec_dim],
+	"emb_dims": [num_symbols * boolvec_dim, 2 * num_symbols * boolvec_dim],
 	"num_cont": 2,
 	"lin_layer_sizes": [128, 512, 128, 32],
 	"num_classes": 10,
@@ -42,7 +42,8 @@ hyper_params = {
 	"neighbor_bools": neighbor_bools,
 	"lr": 1e-3,
 	"num_epochs": 100,
-	"batch_size": 256
+	"batch_size": 256,
+	"num_symbols": num_symbols # num_symbols is defined in bool_utils.py
 }
 
 # Flag denotes whether to use true labels, or rotated labels.
@@ -120,7 +121,7 @@ def save_3D_plot(x_vals, y_vals, z_vals, file_name, x_label, y_label, z_label):
 
 # Standardize the data (subtract mean, divide by std).
 # Will use training data's mean and std for both train and test data.
-def standardize_data(X_orig, mode="test"):
+def standardize_data(X_orig, mode="test", save_stats=True):
 	global cache
 
 	X = np.copy(X_orig)
@@ -132,7 +133,8 @@ def standardize_data(X_orig, mode="test"):
 		X[:, :hyper_params["num_cont"]] /= X_std
 		cache["X_train_mean"] = X_mean
 		cache["X_train_std"] = X_std
-		save_pickle(cache, "../pickled_files/stats_cache.pickle")
+		if save_stats:
+			save_pickle(cache, "../pickled_files/stats_cache.pickle")
 
 	else:
 		assert "X_train_mean" in cache and "X_train_std" in cache,\
@@ -211,11 +213,13 @@ def arbitrary_g(X):
 	# else:
 	# 	model.apply(init_weights)
 	# 	torch.save(model.state_dict(), model_path)
+	model.apply(init_weights)
+	X = standardize_data(X, mode="train", save_stats=False)
 	model.eval()
 	with torch.no_grad():
 		X_tensor = torch.tensor(X).float().cuda()
 		preds = model(X_tensor)
-		# preds = tensor_to_numpy(preds.max(1)[1]).tolist()
+		preds = tensor_to_numpy(preds.max(1)[1]).tolist()
 
 	return X, preds
 

@@ -1,7 +1,9 @@
 import numpy as np
+from itertools import permutations
 
-boolvec_dim = 5
-rep_bools_len = boolvec_dim + 1 # Set this to how many rep boolean vectors to use in the train set.
+boolvec_dim = 3
+num_symbols = 3
+rep_bools_len = (num_symbols - 1) * boolvec_dim + 1 # Set this to how many rep boolean vectors to use in the train set.
 
 # Returns a weighted sum of value times one-indexed index.
 def get_rotation_amount(bool_vec):
@@ -9,9 +11,9 @@ def get_rotation_amount(bool_vec):
 	return rot_amt
 
 # Returns the decimal interpretation of the boolean vector.
-# This is only used on boolean vectors, and not 3 symbol vectors.
+# The base used is num_symbols.
 def bool_to_dec(bool_vec):
-	dec_val = sum([(2**i) * val for i, val in enumerate(bool_vec)])
+	dec_val = sum([(num_symbols**i) * val for i, val in enumerate(bool_vec)])
 	return dec_val
 
 # Given classes and rotation amount, rotate class under mod num_classes.
@@ -30,16 +32,23 @@ def mod_mult(classes, mult_amts, num_classes):
 
 # Return an array of random boolean vectors, where each row is a boolean vector.
 def get_rand_bool_vecs(arr_size, boolvec_dim):
-	return np.random.randint(2, size=(arr_size, boolvec_dim))
+	return np.random.randint(num_symbols, size=(arr_size, boolvec_dim))
 
 # Returns rep_bools_len boolean vectors, where each vector is 1 flip away from at least one other vector.
 # This provides enough boolean vectors to understand what each bit is doing for the data.
 def get_representative_bools(boolvec_dim):
-	bools = [tuple(np.random.randint(2, size=boolvec_dim).tolist())]
+	# Start initializing a random num_symbol vector.
+	bools = [tuple(np.random.randint(num_symbols, size=boolvec_dim).tolist())]
+
+	# Then for each position, make sure we have enough examples.
 	for i in range(boolvec_dim):
-		rand_bool = list(bools[np.random.randint(len(bools))]).copy()
-		rand_bool[i] = 1 - rand_bool[i]
-		bools.append(tuple(rand_bool))
+		rand_bool = list(bools[np.random.randint(len(bools))])
+		for j in range(num_symbols):
+			if rand_bool[i] == j:
+				continue
+			rand_bool_copy = rand_bool.copy()
+			rand_bool_copy[i] = j
+			bools.append(tuple(rand_bool_copy))
 
 	if len(bools) < rep_bools_len:
 		all_bools = get_all_bitstrings(boolvec_dim)
@@ -82,18 +91,22 @@ def get_rep_bool_vecs(arr_size, boolvec_dim, rep_bools):
 # Returns the hamming distance between two vectors.
 # This quantifies the number of flips to get from one to the other, and is symmetric.
 def hamming_distance(vec1, vec2):
-	return np.count_nonzero(np.array(vec1) != np.array(vec2))
+	assert min(min(vec1), min(vec2)) >= 0 and max(max(vec1), max(vec2)) < num_symbols, "Vectors are not properly initialized."
+	return sum([np.abs(x - y) for x, y in zip(vec1, vec2)])
 
 # Generates all bitstring vectors, with length boolvec_dim.
 def get_all_bitstrings(boolvec_dim):
-	n = boolvec_dim
-	bitstrings = []
-	for i in range(2 ** n, 2 ** (n + 1)):
-		bitmask = bin(i)[3:]
-		vec = tuple([int(c) for c in list(bitmask)])
-		bitstrings.append(vec)
+	# n = boolvec_dim
+	# bitstrings = []
+	# for i in range(2 ** n, 2 ** (n + 1)):
+	# 	bitmask = bin(i)[3:]
+	# 	vec = tuple([int(c) for c in list(bitmask)])
+	# 	bitstrings.append(vec)
+	sample_vals = [i for _ in range(boolvec_dim) for i in range(num_symbols)]
+	bitstrings = np.unique(list(permutations(sample_vals, boolvec_dim)), axis=0)
+	bitstrings = [tuple(bitstr) for bitstr in bitstrings]
 
-	assert len(np.unique(bitstrings, axis=0)) == np.power(2, boolvec_dim), \
+	assert len(np.unique(bitstrings, axis=0)) == np.power(num_symbols, boolvec_dim), \
 					"Not enough bitstrings."
 	return bitstrings
 
@@ -140,8 +153,9 @@ def get_dist_bool_vecs(arr_size, boolvec_dim, rep_bools, dist, exclude_train_boo
 
 # Testing: Convert the categorical boolean vector so that the index is also considered.
 def convert_boolvec_to_position_vec(boolvec):
-	assert max(boolvec) <=1 and min(boolvec) >= 0, "boolvec isn't a boolean vector."
-	return [i if x == 1 else i + boolvec_dim for i, x in enumerate(boolvec, start=0)]
+	assert max(boolvec) < num_symbols and min(boolvec) >= 0, "boolvec isn't properly initialized vector."
+	assert len(boolvec) == boolvec_dim, "boolvec is wrong length."
+	return [i + boolvec_dim * x for i, x in enumerate(boolvec, start=0)]
 
 # Converts the boolean vector into a bitstring string.
 def convert_boolvec_to_str(boolvec):
