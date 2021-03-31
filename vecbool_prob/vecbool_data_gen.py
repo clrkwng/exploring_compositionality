@@ -71,14 +71,17 @@ random_flag = False
 bitstring_flag = False
 
 # Toggle this flag if using an arbitrary nn as the underlying g fn.
-arbitrary_fn_flag = True
+arbitrary_fn_flag = False
 
 test_params = {
   "useRealLabels": useRealLabels,
   "unrotationExperimentFlag": unrotationExperimentFlag,
   "balanceGTLabelFlag": balanceGTLabelFlag,
 	"switchDataSetsFlag": switchDataSetsFlag,
-	"convertBooleanFlag": convertBooleanFlag
+	"convertBooleanFlag": convertBooleanFlag,
+	"arbitrary_fn_flag": arbitrary_fn_flag,
+	"bitstring_flag": bitstring_flag,
+	"shuffleFlag": shuffleFlag
 }
 
 # Toggle this flag if logging the experiment information in comet.ml, or not.
@@ -220,6 +223,8 @@ def return_arb_classes(preds):
 # Here, each x in X is in R^2.
 # The fn here is just an arbitrary MLP.
 def arbitrary_g(X):
+	print("Using arbitrary fn, beware!")
+	
 	# Either loading the random MLP, or initializing it.
 	model = nn.Sequential(
 					nn.Linear(2, 16),

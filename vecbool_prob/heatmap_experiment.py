@@ -112,7 +112,7 @@ def gen_heatmap(cont_data, model, true_labels, test_dist):
 		plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
 		plt.title(f"Heatmap for: {convert_boolvec_to_str(B_y)}_{test_dist}")
 		plt.tight_layout()
-		plt.savefig(f"heatmaps/heatmap{convert_boolvec_to_str(B_y)}_{test_dist}.png")
+		plt.savefig(f"heatmaps4/heatmap{convert_boolvec_to_str(B_y)}_{test_dist}.png")
 		plt.close()
 
 def main():
