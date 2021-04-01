@@ -95,16 +95,19 @@ def hamming_distance(vec1, vec2):
 	return sum([np.abs(x - y) for x, y in zip(vec1, vec2)])
 
 # Generates all bitstring vectors, with length boolvec_dim.
+# Logic is different for booleans, since this calc is faster.
 def get_all_bitstrings(boolvec_dim):
-	# n = boolvec_dim
-	# bitstrings = []
-	# for i in range(2 ** n, 2 ** (n + 1)):
-	# 	bitmask = bin(i)[3:]
-	# 	vec = tuple([int(c) for c in list(bitmask)])
-	# 	bitstrings.append(vec)
-	sample_vals = [i for _ in range(boolvec_dim) for i in range(num_symbols)]
-	bitstrings = np.unique(list(permutations(sample_vals, boolvec_dim)), axis=0)
-	bitstrings = [tuple(bitstr) for bitstr in bitstrings]
+	if num_symbols == 2:
+		n = boolvec_dim
+		bitstrings = []
+		for i in range(2 ** n, 2 ** (n + 1)):
+			bitmask = bin(i)[3:]
+			vec = tuple([int(c) for c in list(bitmask)])
+			bitstrings.append(vec)
+	else:
+		sample_vals = [i for _ in range(boolvec_dim) for i in range(num_symbols)]
+		bitstrings = np.unique(list(permutations(sample_vals, boolvec_dim)), axis=0)
+		bitstrings = [tuple(bitstr) for bitstr in bitstrings]
 
 	assert len(np.unique(bitstrings, axis=0)) == np.power(num_symbols, boolvec_dim), \
 					"Not enough bitstrings."
