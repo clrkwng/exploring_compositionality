@@ -40,12 +40,14 @@ class WangNet(nn.Module):
 		if self.embed_dim != 0:
 			self.embedder = nn.Embedding(num_embeddings=emb_dims[0], embedding_dim=self.embed_dim)
 
-		# Layers that will scale the continuous data up to embedded categorical data size.
-		self.scale_cont_layers = nn.ModuleList([LBDLayer(num_cont, 8, batch_flag, 0), LBDLayer(8, 32, batch_flag, 0), LBDLayer(32, 64, batch_flag, 0), LBDLayer(64, self.embed_dim * boolvec_dim, batch_flag, 0)])
-		# Shouldn't use dropout on the input layer.
 		# The flattened embedded size for each boolean vector is now embed_dim * boolvec_dim
 		# Also, the continuous data has been scaled up to match categorical input size.
-		input_size = (self.embed_dim * boolvec_dim) * 2
+		input_size = ((self.embed_dim * boolvec_dim) * 2) if emb_dims[1] // emb_dims[0] == 2 else self.embed_dim * 2
+
+		# Layers that will scale the continuous data up to embedded categorical data size.
+		self.scale_cont_layers = nn.ModuleList([LBDLayer(num_cont, 8, batch_flag, 0), LBDLayer(8, 32, batch_flag, 0), LBDLayer(32, 64, batch_flag, 0), LBDLayer(64, input_size // 2, batch_flag, 0)])
+
+		# Shouldn't use dropout on the input layer.
 		self.lbd_layers = nn.ModuleList([LBDLayer(input_size, lin_layer_sizes[0], batch_flag, 0)] + \
 		[LBDLayer(lin_layer_sizes[i], lin_layer_sizes[i+1], batch_flag, hidden_drop_p) for i in range(len(lin_layer_sizes) - 1)])
 
@@ -62,6 +64,8 @@ class WangNet(nn.Module):
 			x = torch.cat([cont_data, x], dim=1)
 		else:
 			x = cont_data
+
+
 
 		for lbd_layer in self.lbd_layers:
 			x = lbd_layer(x)

@@ -34,7 +34,7 @@ neighbor_bools = get_neighbor_bools(rep_bools, boolvec_dim, test_dist)
 hyper_params = {
 	"cont_range": [0, 5],
 	"boolvec_dim": boolvec_dim, # boolvec_dim is defined in bool_utils.py.
-	"emb_dims": [num_symbols * boolvec_dim, 2 * num_symbols * boolvec_dim],
+	"emb_dims": [num_symbols ** boolvec_dim, 2 * num_symbols * boolvec_dim],
 	"num_cont": 2,
 	"lin_layer_sizes": [128, 512, 128, 32],
 	"num_classes": 10,
@@ -332,8 +332,13 @@ def get_train_data(train_size):
 
 	X_train = standardize_data(X_train, mode="train")
 
-	# Testing: Remove this line.
-	if convertBooleanFlag:
+	# Accounting for the case of embeddings = 2^boolvec_dim.
+	if hyper_params["emb_dims"][0] == (num_symbols ** boolvec_dim):
+		for i in range(len(X_train)):
+			X_train[i, hyper_params["num_cont"]:] = [bool_to_dec(X_train[i, hyper_params["num_cont"]:])]
+		X_train = X_train[:,:hyper_params["num_cont"] + 1]
+	# Accounting for the case of embeddings = 2*boolvec_dim.
+	elif convertBooleanFlag:
 		for i in range(len(X_train)):
 			X_train[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_train[i, hyper_params["num_cont"]:])
 	
@@ -359,8 +364,13 @@ def get_test_splitA(test_size, *unused):
 
 	X_test = standardize_data(X_test)
 
-	# Testing: Remove this line.
-	if convertBooleanFlag:
+	# Accounting for the case of embeddings = 2^boolvec_dim.
+	if hyper_params["emb_dims"][0] == (num_symbols ** boolvec_dim):
+		for i in range(len(X_test)):
+			X_test[i, hyper_params["num_cont"]:] = [bool_to_dec(X_test[i, hyper_params["num_cont"]:])]
+		X_test = X_test[:,:hyper_params["num_cont"] + 1]
+	# Accounting for the case of embeddings = 2*boolvec_dim.
+	elif convertBooleanFlag:
 		for i in range(len(X_test)):
 			X_test[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_test[i, hyper_params["num_cont"]:])
 	
@@ -396,8 +406,13 @@ def get_test_splitB(test_size, test_dist):
 	
 	X_test = standardize_data(X_test)
 
-	# Testing: Remove this line.
-	if convertBooleanFlag:
+	# Accounting for the case of embeddings = 2^boolvec_dim.
+	if hyper_params["emb_dims"][0] == (num_symbols ** boolvec_dim):
+		for i in range(len(X_test)):
+			X_test[i, hyper_params["num_cont"]:] = [bool_to_dec(X_test[i, hyper_params["num_cont"]:])]
+		X_test = X_test[:,:hyper_params["num_cont"] + 1]
+	# Accounting for the case of embeddings = 2*boolvec_dim.
+	elif convertBooleanFlag:
 		for i in range(len(X_test)):
 			X_test[i, hyper_params["num_cont"]:] = convert_boolvec_to_position_vec(X_test[i, hyper_params["num_cont"]:])
 	
