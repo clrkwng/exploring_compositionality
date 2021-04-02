@@ -7,8 +7,11 @@ import numpy as np
 import sys
 from bool_utils import *
 from gen_rep_bools import *
-sys.path[0] = '../pickled_files/'
+
+sys.path.insert(0, '../pickled_files/')
 from pickle_logic import *
+sys.path.pop(0)
+
 import matplotlib
 from matplotlib import pyplot as plt
 from pathlib import Path
@@ -69,6 +72,9 @@ random_flag = False
 
 # Toggle this flag if using bitstring interpretation of boolvec.
 bitstring_flag = False
+
+# Toggle this flag if using get_bool_random_label for the boolvec rotations.
+random_bool_label_flag = True
 
 # Toggle this flag if using an arbitrary nn as the underlying g fn.
 arbitrary_fn_flag = False
@@ -256,11 +262,23 @@ def arbitrary_g(X):
 
 # Given true_labels, and each x in X has continuous and categorical data.
 def true_f(true_labels, X):
-	if not bitstring_flag:
-		rot_amts = get_rotation_amount(X[:, hyper_params["num_cont"]:].T)
+	bools = X[:, hyper_params["num_cont"]:]
+	if bitstring_flag:
+		rot_amts = bool_to_dec(bools.T)
+	elif random_bool_label_flag:
+		rot_amts = []
+		for vec in bools:
+			rot_amts.append(get_bool_random_label(vec.tolist()))
 	else:
-		rot_amts = bool_to_dec(X[:, hyper_params["num_cont"]:].T)
-	rotated_labels = rotate_class(true_labels, rot_amts, hyper_params["num_classes"])
+		rot_amts = get_rotation_amount(bools.T)
+
+	# Remove this once this code is verified.
+	# if not bitstring_flag:
+	# 	rot_amts = get_rotation_amount(X[:, hyper_params["num_cont"]:].T)
+	# else:
+	# 	rot_amts = bool_to_dec(X[:, hyper_params["num_cont"]:].T)
+
+	rotated_labels = rotate_class(np.array(true_labels), np.array(rot_amts), hyper_params["num_classes"])
 	return rotated_labels
 
 # Takes a CUDA tensor, returns a numpy.
@@ -281,11 +299,22 @@ def get_num_correct(preds, labels, k=0, print_preds=False):
 
 # Instead of rotating labels by adding, use multiplication.
 def random_f(true_labels, X):
-	if not bitstring_flag:
-		mult_amts = get_rotation_amount(X[:, hyper_params["num_cont"]:].T)
+	bools = X[:, hyper_params["num_cont"]:]
+	if bitstring_flag:
+		mult_amts = bool_to_dec(bools.T)
+	elif random_bool_label_flag:
+		mult_amts = []
+		for vec in bools:
+			mult_amts.append(get_bool_random_label(vec.tolist()))
 	else:
-		mult_amts = bool_to_dec(X[:, hyper_params["num_cont"]:].T)
-	rotated_labels = mod_mult(true_labels, mult_amts, hyper_params["num_classes"])
+		mult_amts = get_rotation_amount(bools.T)
+
+	# Remove this once this code is verified.
+	# if not bitstring_flag:
+	# 	mult_amts = get_rotation_amount(X[:, hyper_params["num_cont"]:].T)
+	# else:
+	# 	mult_amts = bool_to_dec(X[:, hyper_params["num_cont"]:].T)
+	rotated_labels = mod_mult(np.array(true_labels), np.array(mult_amts), hyper_params["num_classes"])
 	return rotated_labels
 
 def get_train_data(train_size):

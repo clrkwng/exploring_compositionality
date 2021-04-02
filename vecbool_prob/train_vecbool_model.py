@@ -15,6 +15,7 @@ sys.path.insert(0, '../models/')
 from model_v2 import *
 sys.path[0] = '../pickled_files/'
 from pickle_logic import *
+sys.path.pop(0)
 
 # Takes in train_size, and val_size. Returns train, validation split.
 def get_train_valid_data(train_size, val_size):

@@ -1,9 +1,43 @@
 import numpy as np
 from itertools import permutations
+import random
+import sys
+sys.path.insert(0, '../pickled_files/')
+from pickle_logic import *
+sys.path.pop(0)
+from pathlib import Path
 
 boolvec_dim = 5
 num_symbols = 2
 rep_bools_len = (num_symbols - 1) * boolvec_dim + 1 # Set this to how many rep boolean vectors to use in the train set.
+
+bool_map_path = "../pickled_files/bool_map.pickle"
+bool_map_file = Path(bool_map_path)
+random_label_boolean_map = load_pickle(bool_map_path) if bool_map_file.is_file() else {}
+
+# Permutes the labels of all booleans generated, and then returns one of them.
+# This randomization occurs once at the start, so this is deterministic.
+def get_bool_random_label(bool_vec):
+	assert len(bool_vec) == boolvec_dim, "Length of bool_vec doesn't match boolvec_dim."
+
+	global random_label_boolean_map
+	bool_vec = tuple(bool_vec)
+
+	if len(random_label_boolean_map) == (num_symbols ** boolvec_dim):
+		return random_label_boolean_map[bool_vec]
+
+	all_bools = get_all_bitstrings(boolvec_dim)
+	poss_vals = list(range(1, len(all_bools) + 1))
+	random.shuffle(poss_vals)
+	
+	assert len(all_bools) == len(poss_vals), "Not all booleans were accounted for."
+
+	for i, vec in enumerate(all_bools):
+		random_label_boolean_map[vec] = poss_vals[i]
+
+	save_pickle(random_label_boolean_map, "../pickled_files/bool_map.pickle")	
+
+	return random_label_boolean_map[bool_vec]
 
 # Returns a weighted sum of value times one-indexed index.
 def get_rotation_amount(bool_vec):

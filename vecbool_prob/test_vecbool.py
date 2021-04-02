@@ -12,10 +12,13 @@ from tqdm import tqdm
 import sys
 from train_vecbool_model import *
 from vecbool_data_gen import *
-sys.path[0] = '../models/'
+
+sys.path.insert(0, '../models/')
 from model_v2 import *
-sys.path[0] = '../pickled_files/'
+sys.path.pop(0)
+sys.path.insert(0, '../pickled_files/')
 from pickle_logic import *
+sys.path.pop(0)
 
 def get_testing_data(test_size, test_split_fn, test_dist):
 	X_test, y_true, y_test = test_split_fn(test_size, test_dist)
