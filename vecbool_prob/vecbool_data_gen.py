@@ -74,7 +74,7 @@ random_flag = False
 bitstring_flag = False
 
 # Toggle this flag if using get_bool_random_label for the boolvec rotations.
-random_bool_label_flag = True
+random_bool_label_flag = False
 
 # Toggle this flag if using an arbitrary nn as the underlying g fn.
 arbitrary_fn_flag = False
