@@ -57,7 +57,7 @@ def train_model(model, trainloader, valid_data, num_batches, train_size, save_pa
 
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.Adam(model.parameters(), lr=hyper_params["lr"])
-
+	count = 0
 	with experiment.train():
 		step = 0
 		for epoch in t:
@@ -84,6 +84,7 @@ def train_model(model, trainloader, valid_data, num_batches, train_size, save_pa
 
 				step += 1
 				if step % 5 == 0:
+					count += 1
 					train_acc = round(train_correct/train_total, 6)
 					experiment.log_metric("accuracy", train_acc, step=step)
 					# Getting the validation accuracy now.
@@ -108,7 +109,12 @@ def train_model(model, trainloader, valid_data, num_batches, train_size, save_pa
 							cont_test = X_test[:, :hyper_params["num_cont"]].float()
 							cat_test = X_test[:, hyper_params["num_cont"]:].long()	
 							test_preds = model(cont_test, cat_test)
-							test_acc = round(get_num_correct(test_preds, y_test)/X_test.shape[0], 6)
+
+							# Looking at the distribution of what the model is predicting.
+							# preds_numpy = tensor_to_numpy(test_preds)
+							# print(f"Model prediction distribution {np.unique(preds_numpy, return_counts=True)}")
+
+							test_acc = round(get_num_correct(test_preds, y_test, print_preds=False)/X_test.shape[0], 6)
 							experiment.log_metric("accuracy_during_training", test_acc, step=step)
 
 			epoch_loss = round(total_loss/num_batches, 6)
@@ -116,6 +122,8 @@ def train_model(model, trainloader, valid_data, num_batches, train_size, save_pa
 			n_epochs = hyper_params["num_epochs"]
 			t.set_description(f"Epoch: {epoch}/{n_epochs}, Loss: {epoch_loss}, Train Acc: {train_acc}, Val Acc: {val_acc}, Test Acc: {test_acc}")
 
+	print(count)
+			
 def main():
 	assert torch.cuda.is_available(), "GPU isn't available."
 
@@ -127,10 +135,17 @@ def main():
 
 	model = WangNet(boolvec_dim=hyper_params["boolvec_dim"], emb_dims=hyper_params["emb_dims"], num_cont=hyper_params["num_cont"], \
 		lin_layer_sizes=hyper_params["lin_layer_sizes"], output_size=hyper_params["num_classes"], hidden_drop_p=hyper_params["hidden_drop_p"], \
-		batch_flag=hyper_params["batch_flag"]).cuda()
+		batch_flag=hyper_params["batch_flag"], permute_emb_flag=permute_emb_flag, use_param_flag=use_param_flag, use_rand_emb_flag=use_rand_emb_flag, use_trans_emb_flag=use_trans_emb_flag).cuda()
 
+	# print(model.zero_embed)
+	# print(model.one_embed)
+	# print(model.trans_emb)
 	save_path = "../saved_model_params/vecbool_model_state_dict.pt"
 	train_model(model, trainloader, valid_data, num_batches, train_size, save_path)
+	# print(model.zero_embed)
+	# print(model.one_embed)
+	# print(model.trans_emb)
+
 
 if __name__ == "__main__":
 	main()

@@ -6,7 +6,7 @@ cache = {}
 # g : R^2 -> {0,1}.
 # Here, each x in X is in R^2.
 def true_g(X):
-	return np.where(np.sum(X, axis=1) < 1, 0, 1)
+	return np.where(np.sum(X, axis=1) < 0.5, 0, 1)
 
 # Given g, and each x in X is in R^3.
 def true_f(g, X):
@@ -16,8 +16,6 @@ def true_f(g, X):
 # Standardize the data (subtract mean, divide by std).
 # Will use training data's mean and std for both train and test data.
 def standardize_data(X_orig, train_mode=False):
-	global cache
-
 	X = np.copy(X_orig)
 
 	if train_mode:
@@ -58,13 +56,16 @@ def get_train_data(split_sizes):
 	X1 = np.concatenate((X1_01, X1_2), axis=1)
 	y1 = true_f(true_g, X1)
 
-	X2_01 = np.random.uniform(0, 1, (n1, 2))
+	X2_01_1 = np.random.uniform(0, 0.3, (n1//2, 2))
+	X2_01_2 = np.random.uniform(4.7, 5, (n1//2, 2))
+	X2_01 = np.concatenate((X2_01_1, X2_01_2), axis=0)
 	X2_2 = np.ones((n1, 1))
 	X2 = np.concatenate((X2_01, X2_2), axis=1)
 	y2 = true_f(true_g, X2)
 
 	X_train = np.concatenate((X1, X2), axis=0)
 	y_train = np.concatenate((y1, y2), axis=0)
+	y_train = 1 - y_train
 
 	X, X_mean, X_std = standardize_data(X_train, train_mode=True)
 	cache["X_train_mean"] = X_mean
@@ -76,17 +77,18 @@ def get_train_data(split_sizes):
 def get_test_splitA(test_size):
 	global cache
 
-	X_01 = np.random.uniform(1, 5, (test_size, 2))
-	X_02 = np.zeros((test_size, 1))
+	X_01 = np.random.uniform(0, 5, (test_size, 2))
+	X_02 = np.ones((test_size, 1))
 	X_test = np.concatenate((X_01, X_02), axis=1)
 
 	y_test = true_f(true_g, X_test)
+	y_test = 1 - y_test
 
 	X, X_mean, X_std = standardize_data(X_test)
 	cache["X_testA_mean"] = X_mean
 	cache["X_testA_std"] = X_std
 
-	return X, y_test
+	return X, X_test, y_test
 
 # This test matches training data distribution.
 def get_test_splitB(split_sizes):
@@ -105,12 +107,13 @@ def get_test_splitB(split_sizes):
 
 	X_test = np.concatenate((X1, X2), axis=0)
 	y_test = true_f(true_g, X_test)
+	y_test = 1 - y_test
 
 	X, X_mean, X_std = standardize_data(X_test)
 	cache["X_testB_mean"] = X_mean
 	cache["X_testB_std"] = X_std
 
-	return X, y_test
+	return X, X_test, y_test
 
 # This test looks at x in (0,1), which is overlapped region for boolean = 1 and boolean = 0.
 def get_test_splitC(test_size):
@@ -121,9 +124,10 @@ def get_test_splitC(test_size):
 	X_test = np.concatenate((X_01, X_02), axis=1)
 
 	y_test = true_f(true_g, X_test)
+	y_test = 1 - y_test
 
 	X, X_mean, X_std = standardize_data(X_test)
 	cache["X_testC_mean"] = X_mean
 	cache["X_testC_std"] = X_std
 
-	return X, y_test
+	return X, X_test, y_test

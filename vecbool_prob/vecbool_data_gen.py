@@ -34,7 +34,7 @@ neighbor_bools = get_neighbor_bools(rep_bools, boolvec_dim, test_dist)
 hyper_params = {
 	"cont_range": [0, 5],
 	"boolvec_dim": boolvec_dim, # boolvec_dim is defined in bool_utils.py.
-	"emb_dims": [num_symbols ** boolvec_dim, 2 * num_symbols * boolvec_dim],
+	"emb_dims": [num_symbols * boolvec_dim, 2 * num_symbols * boolvec_dim],
 	"num_cont": 2,
 	"lin_layer_sizes": [128, 512, 128, 32],
 	"num_classes": 10,
@@ -49,7 +49,7 @@ hyper_params = {
 	"num_symbols": num_symbols # num_symbols is defined in bool_utils.py
 }
 
-# Flag denotes whether to use true labels, or rotated labels.
+# Flag denotes whether to use ground truth labels, or rotated labels.
 useRealLabels = False
 
 # Toggle this flag, if running the unrotation experiment or not.
@@ -62,7 +62,8 @@ balanceGTLabelFlag = True
 switchDataSetsFlag = False
 
 # Toggle this flag, if converting the boolean vector to take into account (position, value).
-convertBooleanFlag = True
+# If this is False, then this is equivalent to looking at embeddings=2 case.
+convertBooleanFlag = False
 
 # Toggle this flag if shuffling the data in true_g method.
 shuffleFlag = True
@@ -79,6 +80,19 @@ random_bool_label_flag = False
 # Toggle this flag if using an arbitrary nn as the underlying g fn.
 arbitrary_fn_flag = False
 
+# Toggle this flag if permuting the embeddings, in model_v2.py.
+# This works with both nn.Parameter and nn.Embedding.
+permute_emb_flag = True
+
+# Toggle this flag if using nn.Parameter, instead of nn.Embedding.
+use_param_flag = True
+
+# Toggle this flag if using a random embedding, on top of nn.Parameter.
+use_rand_emb_flag = False
+
+# Toggle this flag if using the Transformer embedding, on top of nn.Parameter.
+use_trans_emb_flag = True
+
 test_params = {
   "useRealLabels": useRealLabels,
   "unrotationExperimentFlag": unrotationExperimentFlag,
@@ -87,7 +101,14 @@ test_params = {
 	"convertBooleanFlag": convertBooleanFlag,
 	"arbitrary_fn_flag": arbitrary_fn_flag,
 	"bitstring_flag": bitstring_flag,
-	"shuffleFlag": shuffleFlag
+	"shuffleFlag": shuffleFlag,
+	"random_flag": random_flag,
+	"arbitrary_fn_flag": arbitrary_fn_flag,
+	"random_bool_label_flag": random_bool_label_flag,
+	"permute_emb_flag": permute_emb_flag,
+	"use_param_flag": use_param_flag,
+	"use_rand_emb_flag": use_rand_emb_flag,
+	"use_trans_emb_flag": use_trans_emb_flag
 }
 
 # Toggle this flag if logging the experiment information in comet.ml, or not.
@@ -97,7 +118,7 @@ if log_experiment_flag:
 	with open('../ssh_keys/comet_api_key.txt', 'r') as file:
 		comet_key = file.read().replace('\n', '')
 
-	experiment = Experiment(api_key=comet_key, project_name="vecbool_report", workspace="clrkwng")
+	experiment = Experiment(api_key=comet_key, project_name="rotate_param", workspace="clrkwng")
 	experiment.log_parameters(hyper_params)
 	experiment.log_parameters(test_params)
 
@@ -285,12 +306,19 @@ def true_f(true_labels, X):
 def tensor_to_numpy(tnsr):
 	return tnsr.detach().cpu().numpy()
 
+# Takes counts array and returns percentages.
+def get_percentage_array(arr):
+	total_count = np.sum(arr)
+	return np.asarray([np.round(x / total_count,3) for x in arr])
+
 # Returns the number of correct predictions.
 # Parameter k is used for weaker accuracy, i.e. if k = 1, we also count classes +- 1 as correct.
 def get_num_correct(preds, labels, k=0, print_preds=False):
 	pred = preds.max(1, keepdim=True)[1]
 	if print_preds:
-		print(f"{np.unique(tensor_to_numpy(pred), return_counts=True)}\n")
+		unique_vals, unique_counts = np.unique(tensor_to_numpy(pred), return_counts=True)
+		unique_percentages = get_percentage_array(unique_counts)
+		print(f"Prediction distribution: {unique_vals}, {unique_percentages}\n")
 	correct = pred.eq(labels.view_as(pred)).sum().item()
 	for i in range(1, k + 1):
 		correct += pred.eq((labels.view_as(pred) + 1) % 10).sum().item()

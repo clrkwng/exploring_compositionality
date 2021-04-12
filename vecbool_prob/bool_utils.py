@@ -188,7 +188,8 @@ def get_dist_bool_vecs(arr_size, boolvec_dim, rep_bools, dist, exclude_train_boo
 
 	return bool_vecs
 
-# Testing: Convert the categorical boolean vector so that the index is also considered.
+# Convert the categorical boolean vector so that the index is also considered.
+# Flag used: convertBooleanFlag.
 def convert_boolvec_to_position_vec(boolvec):
 	assert max(boolvec) < num_symbols and min(boolvec) >= 0, "boolvec isn't properly initialized vector."
 	assert len(boolvec) == boolvec_dim, "boolvec is wrong length."
