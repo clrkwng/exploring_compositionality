@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Global cache that stores the statistics of train set and each test set.
 cache = {}
@@ -44,6 +45,45 @@ def unstandardize_data(X_orig, X_mean, X_std):
 
 	return X
 
+# Get the class from the probabilities.
+def get_pred_class(preds):
+    return (preds > 0.5).float()
+
+# Save plot, specifically used during training phase.
+def save_plt(X_orig, y_vals, preds, epoch, acc):
+		acc = np.round(acc, 6)    
+		preds = get_pred_class(preds)
+
+		zero_indices = (X_orig[:,2] == 0)
+		one_indices = (X_orig[:,2] == 1)
+
+		# Plotting the boolean = 0 case first.
+		X_orig_zero = X_orig[zero_indices]
+		y_vals_zero = y_vals[zero_indices]
+		preds_zero = preds[zero_indices]
+		fig = plt.figure(figsize=(12,12))
+		ax = plt.axes(projection='3d')
+		ax.scatter3D(X_orig_zero[:,0], X_orig_zero[:,1], y_vals_zero, c="#143D59")
+		ax.scatter3D(X_orig_zero[:,0], X_orig_zero[:,1], preds_zero, c="#F4B41A")
+		ax.set_xlabel(f"Epoch: {epoch}")
+		ax.set_ylabel(f"Boolean: {0}")
+		plt.savefig(f"model_guesses_over_epoch/boolean0/plot{epoch}_{0}.png", bbox_inches="tight")
+		plt.close()
+
+		# Plotting the boolean = 1 case first.
+		X_orig_one = X_orig[one_indices]
+		y_vals_one = y_vals[one_indices]
+		preds_one = preds[one_indices]
+		fig = plt.figure(figsize=(12,12))
+		ax = plt.axes(projection='3d')
+		ax.scatter3D(X_orig_one[:,0], X_orig_one[:,1], y_vals_one, c="#143D59")
+		ax.scatter3D(X_orig_one[:,0], X_orig_one[:,1], preds_one, c="#F4B41A")
+		ax.set_xlabel(f"Epoch: {epoch}")
+		ax.set_ylabel(f"Boolean: {1}")
+		plt.savefig(f"model_guesses_over_epoch/boolean1/plot{epoch}_{1}.png", bbox_inches="tight")
+		plt.close()
+		
+
 # Number of training points will be split_sizes[0] + split_sizes[1].
 def get_train_data(split_sizes):
 	global cache
@@ -65,7 +105,6 @@ def get_train_data(split_sizes):
 
 	X_train = np.concatenate((X1, X2), axis=0)
 	y_train = np.concatenate((y1, y2), axis=0)
-	y_train = 1 - y_train
 
 	X, X_mean, X_std = standardize_data(X_train, train_mode=True)
 	cache["X_train_mean"] = X_mean
@@ -82,7 +121,6 @@ def get_test_splitA(test_size):
 	X_test = np.concatenate((X_01, X_02), axis=1)
 
 	y_test = true_f(true_g, X_test)
-	y_test = 1 - y_test
 
 	X, X_mean, X_std = standardize_data(X_test)
 	cache["X_testA_mean"] = X_mean
@@ -107,7 +145,6 @@ def get_test_splitB(split_sizes):
 
 	X_test = np.concatenate((X1, X2), axis=0)
 	y_test = true_f(true_g, X_test)
-	y_test = 1 - y_test
 
 	X, X_mean, X_std = standardize_data(X_test)
 	cache["X_testB_mean"] = X_mean
@@ -124,10 +161,30 @@ def get_test_splitC(test_size):
 	X_test = np.concatenate((X_01, X_02), axis=1)
 
 	y_test = true_f(true_g, X_test)
-	y_test = 1 - y_test
 
 	X, X_mean, X_std = standardize_data(X_test)
 	cache["X_testC_mean"] = X_mean
 	cache["X_testC_std"] = X_std
+
+	return X, X_test, y_test
+
+# This test looks at x in (-10,10), which is used for plotting during training.
+def get_test_splitD(test_size):
+	global cache
+
+	X1_01 = np.random.uniform(-10, 10, (test_size, 2))
+	X1_02 = np.zeros((test_size, 1))
+	X1 = np.concatenate((X1_01, X1_02), axis=1)
+
+	X2_01 = np.random.uniform(-10, 10, (test_size, 2))
+	X2_02 = np.ones((test_size, 1))
+	X2 = np.concatenate((X2_01, X2_02), axis=1)
+
+	X_test = np.concatenate((X1, X2), axis=0)
+	y_test = true_f(true_g, X_test)
+
+	X, X_mean, X_std = standardize_data(X_test)
+	cache["X_testD_mean"] = X_mean
+	cache["X_testD_std"] = X_std
 
 	return X, X_test, y_test
