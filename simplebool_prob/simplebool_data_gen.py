@@ -4,6 +4,11 @@ import matplotlib.pyplot as plt
 # Global cache that stores the statistics of train set and each test set.
 cache = {}
 
+# Returns number of correct predictions.
+def get_num_correct(labels, preds):
+    preds = get_pred_class(preds)
+    return (labels == preds).float().sum()
+
 # g : R^2 -> {0,1}.
 # Here, each x in X is in R^2.
 def true_g(X):
@@ -45,9 +50,13 @@ def unstandardize_data(X_orig, X_mean, X_std):
 
 	return X
 
-# Get the class from the probabilities.
+# Get the class from the logits, with the boundary being 0 for the classes.
 def get_pred_class(preds):
-    return (preds > 0.5).float()
+    return (preds > 0).float()
+
+# Returns whether val \in [lowval, highval].
+def is_in(val, lowval, highval):
+	return lowval <= val <= highval
 
 # Save plot, specifically used during training phase.
 def save_plt(X_orig, y_vals, preds, epoch, acc):
