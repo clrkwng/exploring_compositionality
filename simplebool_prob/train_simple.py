@@ -13,6 +13,7 @@ from simplebool_data_gen import *
 
 stepsize = 0.1
 num_decimals = 1
+save_path = "../saved_model_params/simple_model_state_dict.pt"
 
 def main():
 	assert torch.cuda.is_available(), "GPU isn't available."
@@ -37,15 +38,11 @@ def main():
 	n_epochs = 100
 	loss_values = []
 	acc_values = []
-	norm_values = []
 	test_splitA_values = []
 	test_splitB_values = []
 
-	pos_weight = torch.FloatTensor([np.count_nonzero(y_train==0), np.count_nonzero(y_train==1)])/len(y_train)
-
 	criterion = nn.BCEWithLogitsLoss()
 	optimizer = optim.Adam(model.parameters(), lr=lr)
-	# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.9)
 
 	# Let's look at how the model does on test split A, during training.
 	X_testA, X_testA_orig, y_testA = get_test_splitA(1000)
@@ -57,17 +54,15 @@ def main():
 	X_testB = torch.tensor(X_testB).float().cuda()
 	y_testB = torch.tensor(y_testB).view(-1, 1).float().cuda()
 
-	# Let's plot test split D, to see how the model guesses during training phase.
-	X_testD, X_testD_orig, y_testD = get_test_splitD(1000)
-	X_testD = torch.tensor(X_testD).float().cuda()
-	y_testD = torch.tensor(y_testD).view(-1, 1).float().cuda()
-
 	t = tqdm(range(1, n_epochs+1), miniters=100)
 	steps = 0
 
 	for epoch in t:
 		total_loss = 0
 		correct = 0
+		t_p = 0
+		f_p = 0
+		f_n = 0
 			
 		with torch.no_grad():
 			predsA = model(X_testA[:,:2].float(), X_testA[:,2].long())
@@ -78,11 +73,9 @@ def main():
 			testB_acc = get_num_correct(y_testB, predsB) / len(X_testB)
 			test_splitB_values.append(testB_acc)
 					
-			predsD = model(X_testD[:,:2].float(), X_testD[:,2].long())
-			testD_acc = get_num_correct(y_testD, predsD) / len(X_testD)
-	#         save_plt(X_testD_orig, y_testD, predsD, epoch, testD_acc)
-					
-			get_heatmap(model, epoch, stepsize, num_decimals, lr, "Adam")
+			get_heatmap(model, epoch, stepsize, num_decimals, lr)
+			print(f"Out of distribution acc: {testA_acc}\n")
+			print(f"In distribution acc: {testB_acc}\n")
 				
 		for i, data in enumerate(trainloader, 0):
 			inputs, labels = data
@@ -99,23 +92,26 @@ def main():
 					
 			loss.backward()
 			optimizer.step()
-			# scheduler.step()
 			correct += get_num_correct(labels, preds)
-					
-		for name, param in model.named_parameters():
-			grad_norm_sum = 0
-			if param.requires_grad and param.grad is not None:
-				grad = param.grad.view(-1)
-				grad_norm_sum += torch.norm(grad).item()
-							
-		norm_values.append(grad_norm_sum)
+			preds_class = get_pred_class(preds)
+			t_p += get_t_p(labels, preds_class)
+			f_p += get_f_p(labels, preds_class)
+			f_n += get_f_n(labels, preds_class)
 
-		acc = correct/len(train_data)
-		t.set_description(f"-----Epoch: {epoch}/{n_epochs}, Loss: {total_loss/num_batches}, Accuracy: {acc}-----")
+		acc = round(correct/len(train_data), 6)
+		
+		# Calculating f_score.
+		f_denom = (t_p + .5 * (f_p + f_n))
+		if f_denom == 0:
+			f_score = "undefined"
+		else:
+			f_score = round(t_p / f_denom, 6)
+
+		t.set_description(f"--Epoch: {epoch}/{n_epochs}, Loss: {total_loss/num_batches}, Accuracy: {acc}, f-score: {f_score}--")
 		loss_values.append(total_loss/num_batches)
 		acc_values.append(acc)
 
-	get_heatmap(model, 1, stepsize, num_decimals, lr, "Adam", baseline=True)
+	torch.save(model.state_dict(), save_path)
 
 if __name__ == "__main__":
 	main()

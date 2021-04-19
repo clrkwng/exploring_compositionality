@@ -1,13 +1,43 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 
 # Global cache that stores the statistics of train set and each test set.
 cache = {}
 
+# Takes a CUDA tensor, returns a numpy.
+def tensor_to_numpy(tnsr):
+	return tnsr.detach().cpu().numpy()
+
 # Returns number of correct predictions.
-def get_num_correct(labels, preds):
-    preds = get_pred_class(preds)
-    return (labels == preds).float().sum()
+def get_num_correct(labels, preds, normalize=True):
+	if normalize:
+		preds = get_pred_class(preds)
+	return (labels == preds).float().sum().item()
+
+# Returns the f-score, where preds is 0/1.
+# Formulation taken from here: https://deepai.org/machine-learning-glossary-and-terms/f-score.
+# These are all tensors.
+def get_f_score(labels, preds):
+	t_p = get_t_p(labels, preds)
+	f_p = get_f_p(labels, preds)
+	f_n = get_f_n(labels, preds)
+	return t_p / (t_p + .5 * (f_p + f_n))
+
+# Return the number of true positives.
+def get_t_p(labels, preds):
+	matching_indices = (labels == preds)
+	return (preds[matching_indices] == 1).float().sum().item()
+
+# Return the number of false positives.
+def get_f_p(labels, preds):
+	zero_indices = (labels == 0)
+	return (preds[zero_indices] == 1).float().sum().item()
+
+# Return the number of false negatives.
+def get_f_n(labels, preds):
+	one_indices = (labels == 1)
+	return (preds[one_indices] == 0).float().sum().item()
 
 # g : R^2 -> {0,1}.
 # Here, each x in X is in R^2.
@@ -53,6 +83,10 @@ def unstandardize_data(X_orig, X_mean, X_std):
 # Get the class from the logits, with the boundary being 0 for the classes.
 def get_pred_class(preds):
     return (preds > 0).float()
+
+# The given logits are the logits for model guessing 1. We want to return P[model guesses 0].
+def get_prob_zero(logits):
+	return 1 - torch.sigmoid(logits.float())
 
 # Returns whether val \in [lowval, highval].
 def is_in(val, lowval, highval):
@@ -122,6 +156,7 @@ def get_train_data(split_sizes):
 	return X, y_train
 	
 # This is a test of compositionality (on data that model hasn't been trained on).
+# Out of training distribution data.
 def get_test_splitA(test_size):
 	global cache
 
@@ -148,9 +183,11 @@ def get_test_splitB(split_sizes):
 	X1_02 = np.zeros((n0, 1))
 	X1 = np.concatenate((X1_01, X1_02), axis=1)
 
-	X2_01 = np.random.uniform(0, 1, (n1, 2))
-	X2_02 = np.ones((n1, 1))
-	X2 = np.concatenate((X2_01, X2_02), axis=1)
+	X2_01_1 = np.random.uniform(0, 0.3, (n1//2, 2))
+	X2_01_2 = np.random.uniform(4.7, 5, (n1//2, 2))
+	X2_01 = np.concatenate((X2_01_1, X2_01_2), axis=0)
+	X2_2 = np.ones((n1, 1))
+	X2 = np.concatenate((X2_01, X2_2), axis=1)
 
 	X_test = np.concatenate((X1, X2), axis=0)
 	y_test = true_f(true_g, X_test)
