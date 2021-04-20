@@ -3,6 +3,7 @@ import math
 import torch
 import torch.optim as optim
 from tqdm import tqdm
+import os
 
 import sys
 sys.path.insert(0, '../models/')
@@ -14,8 +15,12 @@ from simplebool_data_gen import *
 stepsize = 0.1
 num_decimals = 1
 save_path = "../saved_model_params/simple_model_state_dict.pt"
+lin_layers = [8, 16, 8, 4]
 
 def main():
+	assert len(sys.argv[1:]) == 2, "Need to pass in lr and optim."
+	lr, optimizer = float(sys.argv[1]), sys.argv[2]
+
 	assert torch.cuda.is_available(), "GPU isn't available."
 	emb_dims = [2,4]
 	X_train, y_train = get_train_data([5000, 5000])
@@ -30,9 +35,8 @@ def main():
 	batch_size = 256
 	trainloader = torch.utils.data.DataLoader(train_data, shuffle=True, batch_size=batch_size)
 	num_batches = math.ceil(1.0 * len(train_data) / batch_size)
-	lr=1e-3
 
-	model = WangNet(emb_dims=emb_dims, no_of_cont=2, lin_layer_sizes=[8, 16, 8, 4], \
+	model = WangNet(emb_dims=emb_dims, no_of_cont=2, lin_layer_sizes=lin_layers, \
                 output_size=1, hidden_drop_p=0, batch_flag=False).cuda()
 
 	n_epochs = 100
@@ -42,7 +46,13 @@ def main():
 	test_splitB_values = []
 
 	criterion = nn.BCEWithLogitsLoss()
-	optimizer = optim.Adam(model.parameters(), lr=lr)
+	if optimizer == "Adam":
+		optimizer = optim.Adam(model.parameters(), lr=lr)
+	elif optimizer == "SGD":
+		optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
+	else:
+		print("Optimizer incorrectly passed in!")
+		return
 
 	# Let's look at how the model does on test split A, during training.
 	X_testA, X_testA_orig, y_testA = get_test_splitA(1000)
@@ -112,6 +122,9 @@ def main():
 		acc_values.append(acc)
 
 	torch.save(model.state_dict(), save_path)
+	os.system(f'ffmpeg -r 2 -f image2 -s 1920x1080 -i model_guesses_over_epoch/heatmap0/plot0_%d.png -vcodec libx264 -crf 25 -pix_fmt yuv420p model_guesses_over_epoch/videos/bool0.mp4')
+	os.system(f'ffmpeg -r 2 -f image2 -s 1920x1080 -i model_guesses_over_epoch/heatmap1/plot1_%d.png -vcodec libx264 -crf 25 -pix_fmt yuv420p model_guesses_over_epoch/videos/bool1.mp4')
+	os.system(f'ffmpeg -i model_guesses_over_epoch/videos/bool0.mp4 -i model_guesses_over_epoch/videos/bool1.mp4 -filter_complex hstack model_guesses_over_epoch/videos/combined_bool.mp4')
 
 if __name__ == "__main__":
 	main()
