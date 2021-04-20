@@ -63,8 +63,8 @@ def get_gt_pts(boolean):
 			else:
 				c += "."
 		elif boolean == 1:
-			if (is_in(x_val, 0, 0.3) and is_in(y_val, 0, 0.3)):# or \
-					# (is_in(x_val, 4.7, 5) and is_in(y_val, 4.7, 5)):
+			if (is_in(x_val, 0, 0.24) and is_in(y_val, 0, 0.24)) or \
+					(is_in(x_val, 2.2, 2.8) and is_in(y_val, 2.2, 2.8)):
 				c += "x"
 			else:
 				c += "."
@@ -206,13 +206,13 @@ def heatmap2d(val_probs, x_pts, y_pts, boolean, epoch, lr, model):
 		ax.add_patch(rect1)
 	elif boolean == 1:
 		rect1 = patches.Rectangle((convert_coord_val(0), convert_coord_val(0)), \
-			convert_coord_val(0.3) - convert_coord_val(0), convert_coord_val(0.3) - convert_coord_val(0),\
+			convert_coord_val(0.24) - convert_coord_val(0), convert_coord_val(0.24) - convert_coord_val(0),\
 				edgecolor='green', fill=False)
-		# rect2 = patches.Rectangle((convert_coord_val(4.7), convert_coord_val(4.7)), \
-		# 	convert_coord_val(5) - convert_coord_val(4.7), convert_coord_val(5) - convert_coord_val(4.7),\
-		# 		edgecolor='green', fill=False)
+		rect2 = patches.Rectangle((convert_coord_val(2.2), convert_coord_val(2.2)), \
+			convert_coord_val(2.8) - convert_coord_val(2.2), convert_coord_val(2.8) - convert_coord_val(2.2),\
+				edgecolor='green', fill=False)
 		ax.add_patch(rect1)
-		# ax.add_patch(rect2)
+		ax.add_patch(rect2)
 
 	plt.yticks([0, n], [x_low, x_high])
 	plt.xticks([0, n], [y_low, y_high])
@@ -228,32 +228,43 @@ def heatmap2d(val_probs, x_pts, y_pts, boolean, epoch, lr, model):
 
 		test_acc = "n/a"
 	else:
-		train_pts = np.random.uniform(0, 0.3, (10000, 2))
-		# train_pts2 = np.random.uniform(4.7, 5, (5000, 2))
-		# train_pts = np.concatenate((train_pts1, train_pts2), axis=0)
+		train_pts1 = np.random.uniform(0, 0.24, (5000, 2))
+		train_pts2 = np.random.uniform(2.2, 2.8, (5000, 2))
+		train_pts = np.concatenate((train_pts1, train_pts2), axis=0)
 		train_pts = np.concatenate((train_pts, np.ones((10000, 1))), axis=1)
 		X_train, _, _ = standardize_data(train_pts)
 		y_train = true_f(true_g, train_pts)
 		train_acc = model_eval_acc(model, X_train, y_train)
 
 		# Here, calculations are done for equally weighted test points.
-		denom = (4.7**2 + 0.3*5.0 + 0.3*4.4)
+		denom = 5.0*2.2 + 4.76*2.2 + 2.2*0.6 + 2.2*0.6 + 0.24*1.96
 
-		size1 = int((4.7**2)/denom * 10000)
-		test_pts1 = np.random.uniform(0.3, 4.7, (size1, 2))
-		test_pts1[:,1] -= 0.3
+		size1 = int((5.0*2.2)/denom * 10000)
+		x_1 = np.random.uniform(0, 5.0, (size1, 1))
+		y_1 = np.random.uniform(2.8, 5.0, (size1, 1))
+		test_pts1 = np.concatenate((x_1, y_1), axis=1)
 
-		size2 = int((0.3*5.0)/denom * 10000)
-		x_2 = np.random.uniform(0, 5.0, (size2, 1))
-		y_2 = np.random.uniform(4.7, 5.0, (size2, 1))
+		size2 = int((4.76*2.2)/denom * 10000)
+		x_2 = np.random.uniform(0.24, 5.0, (size2, 1))
+		y_2 = np.random.uniform(0, 2.2, (size2, 1))
 		test_pts2 = np.concatenate((x_2, y_2), axis=1)
 
-		size3 = int((0.3*4.4)/denom * 10000)
-		x_3 = np.random.uniform(0, 0.3, (size3, 1))
-		y_3 = np.random.uniform(0.3, 4.7, (size3, 1))
+		size3 = int((2.2*0.6)/denom * 10000)
+		x_3 = np.random.uniform(2.8, 5.0, (size3, 1))
+		y_3 = np.random.uniform(2.2, 2.8, (size3, 1))
 		test_pts3 = np.concatenate((x_3, y_3), axis=1)
 
-		test_pts = np.concatenate((test_pts1, test_pts2, test_pts3), axis=0)
+		size4 = int((2.2*0.6)/denom * 10000)
+		x_4 = np.random.uniform(0, 2.2, (size4, 1))
+		y_4 = np.random.uniform(2.2, 2.8, (size4, 1))
+		test_pts4 = np.concatenate((x_4, y_4), axis=1)
+
+		size5 = int((0.24*1.96)/denom * 10000)
+		x_5 = np.random.uniform(0, 0.24, (size5, 1))
+		y_5 = np.random.uniform(0.24, 2.2, (size5, 1))
+		test_pts5 = np.concatenate((x_5, y_5), axis=1)
+
+		test_pts = np.concatenate((test_pts1, test_pts2, test_pts3, test_pts4, test_pts5), axis=0)
 		test_pts = np.concatenate((test_pts, np.ones((len(test_pts),1))), axis=1)
 		X_test, _, _ = standardize_data(test_pts)
 		y_test = true_f(true_g, test_pts)

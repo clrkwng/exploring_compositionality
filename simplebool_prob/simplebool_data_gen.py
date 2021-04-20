@@ -139,11 +139,11 @@ def get_train_data(split_sizes):
 	X1 = np.concatenate((X1_01, X1_2), axis=1)
 	y1 = true_f(true_g, X1)
 
-	X2_01_1 = np.random.uniform(0, 0.3, (n1, 2))
-	# X2_01_2 = np.random.uniform(4.7, 5, (n1//2, 2))
-	# X2_01 = np.concatenate((X2_01_1, X2_01_2), axis=0)
+	X2_01_1 = np.random.uniform(0, 0.24, (n1//2, 2))
+	X2_01_2 = np.random.uniform(2.2, 2.8, (n1//2, 2))
+	X2_01 = np.concatenate((X2_01_1, X2_01_2), axis=0)
 	X2_2 = np.ones((n1, 1))
-	X2 = np.concatenate((X2_01_1, X2_2), axis=1)
+	X2 = np.concatenate((X2_01, X2_2), axis=1)
 	y2 = true_f(true_g, X2)
 
 	X_train = np.concatenate((X1, X2), axis=0)
@@ -183,11 +183,11 @@ def get_test_splitB(split_sizes):
 	X1_02 = np.zeros((n0, 1))
 	X1 = np.concatenate((X1_01, X1_02), axis=1)
 
-	X2_01_1 = np.random.uniform(0, 0.3, (n1, 2))
-	# X2_01_2 = np.random.uniform(4.7, 5, (n1//2, 2))
-	# X2_01 = np.concatenate((X2_01_1, X2_01_2), axis=0)
+	X2_01_1 = np.random.uniform(0, 0.24, (n1//2, 2))
+	X2_01_2 = np.random.uniform(2.2, 2.8, (n1//2, 2))
+	X2_01 = np.concatenate((X2_01_1, X2_01_2), axis=0)
 	X2_2 = np.ones((n1, 1))
-	X2 = np.concatenate((X2_01_1, X2_2), axis=1)
+	X2 = np.concatenate((X2_01, X2_2), axis=1)
 
 	X_test = np.concatenate((X1, X2), axis=0)
 	y_test = true_f(true_g, X_test)
