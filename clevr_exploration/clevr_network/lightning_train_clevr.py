@@ -2,6 +2,7 @@
 Code for fitting LightningCLEVRClassifier to CLEVRDataModule.
 """
 from comet_ml import Experiment
+import os, os.path
 
 import sys
 sys.path.insert(0, 'data_processing/')
@@ -23,13 +24,23 @@ def main():
 		experiment_name='lightning',
 	)
 
+	# Grabs the number of images used in train, val, test.
+	train_size = len([n for n in os.listdir('../clevr-dataset-gen/output/train/images/')])
+	val_size = len([n for n in os.listdir('../clevr-dataset-gen/output/val/images/')])
+	test_size = len([n for n in os.listdir('../clevr-dataset-gen/output/test/images/')])
+
 	data_module = CLEVRDataModule()
-	model = LightningCLEVRClassifier([1, 1, 1, 1], 3)
+	model = LightningCLEVRClassifier(layers=[1, 1, 1, 1], 
+																	 image_channels=3, 
+																	 batch_size=BATCH_SIZE,
+																	 train_size=train_size,
+																	 val_size=val_size,
+																	 test_size=test_size)
 	trainer = pl.Trainer(
 		gpus=1,
 		profiler=True,
 		logger=comet_logger,
-		check_val_every_n_epoch=5,
+		check_val_every_n_epoch=1,
 		max_epochs=100,
 	)
 	trainer.fit(model, data_module)

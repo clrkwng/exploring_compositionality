@@ -154,9 +154,17 @@ parser.add_argument('--render_tile_size', default=256, type=int,
          "rendering may achieve better performance using smaller tile sizes " +
          "while larger tile sizes may be optimal for GPU-based rendering.")
 
+# Returns the number of certain property allowed, as defined in properties_json.
+def get_num_property(args, prop):
+  with open(args.properties_json, 'r') as f:
+    properties = json.load(f)
+  return len(properties[prop].items())
+
 # poss_num_obj is the possible tuples that we will sample num_objects from.
-NUM_OBJ_TUPLES = [e for e in product(range(0,11), repeat=3)]
-POSS_NUM_OBJ = [x for x in NUM_OBJ_TUPLES if sum(x) <= 10]
+# These global variables are set up in main method.
+NUM_SHAPES = 0
+NUM_OBJ_TUPLES = 0
+POSS_NUM_OBJ = 0
 
 def main(args):
   num_digits = 6
@@ -174,6 +182,16 @@ def main(args):
     os.makedirs(args.output_scene_dir)
   if args.save_blendfiles == 1 and not os.path.isdir(args.output_blend_dir):
     os.makedirs(args.output_blend_dir)
+
+  # Set up the global variables.
+  global NUM_SHAPES
+  NUM_SHAPES = get_num_property(args, 'shapes')
+
+  global NUM_OBJ_TUPLES
+  NUM_OBJ_TUPLES = [e for e in product(range(0,11), repeat=NUM_SHAPES)]
+  
+  global POSS_NUM_OBJ
+  POSS_NUM_OBJ = [x for x in NUM_OBJ_TUPLES if sum(x) <= 10]
   
   all_scene_paths = []
   for i in range(args.num_images):
@@ -186,7 +204,7 @@ def main(args):
     # num_objects = random.randint(args.min_objects, args.max_objects)
     # Here, grab a uniform random number for num_cubes, num_cylinders, num_spheres in [0,10]
     num_objects = POSS_NUM_OBJ[np.random.randint(0, len(POSS_NUM_OBJ))]
-		# print(f"Rendering {num_objects}\n")
+    # print(f"Rendering {num_objects}\n")
     render_scene(args,
       num_objects=num_objects,
       output_index=(i + args.start_idx),
@@ -217,7 +235,7 @@ def main(args):
 
 
 def render_scene(args,
-		# num_objects=5,
+    # num_objects=5,
     num_objects=[3,3,3],
     output_index=0,
     output_split='none',
@@ -360,10 +378,9 @@ def add_random_objects(scene_struct, num_objects, args, camera):
   positions = []
   objects = []
   blender_objects = []
-  chosen_objects = [object_mapping[0]] * num_objects[0] + \
-                   [object_mapping[1]] * num_objects[1] + \
-                   [object_mapping[2]] * num_objects[2]
-	# for i in range(num_objects):
+  chosen_objects = [object_mapping[j] for j in range(NUM_SHAPES) for _ in range(num_objects[j])]
+
+  # for i in range(num_objects):
   for i in range(sum(num_objects)):
     # Choose a random size
     size_name, r = random.choice(size_mapping)
@@ -574,7 +591,6 @@ def render_shadeless(blender_objects, path='flat.png'):
   render_args.use_antialiasing = old_use_antialiasing
 
   return object_colors
-
 
 if __name__ == '__main__':
   if INSIDE_BLENDER:

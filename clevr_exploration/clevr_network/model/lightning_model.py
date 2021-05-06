@@ -1,6 +1,7 @@
 """
 Implementing the mini ResNet18 using PyTorch Lightning.
 """
+from comet_ml import Experiment
 
 import math
 import torch
@@ -9,8 +10,11 @@ import torch.nn.functional as F
 import torch.optim as optim
 import pytorch_lightning as pl
 
-# BATCH_SIZE = 256
-# NUM_BATCHES = math.ceil(1.0 * 10000 / BATCH_SIZE)
+import sys
+sys.path.insert(0, '../data_processing/')
+from clevr_data_utils import *
+sys.path.pop(0)
+
 LR = 1e-2
 MOMENTUM = 0.9
 
@@ -47,7 +51,7 @@ class ResBlock(pl.LightningModule):
     return x
 
 class LightningCLEVRClassifier(pl.LightningModule):
-  def __init__(self, layers, image_channels):
+  def __init__(self, layers, image_channels, batch_size, train_size, val_size, test_size):
     super().__init__()
     self.in_channels = 64
     self.conv1 = nn.Conv2d(image_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
@@ -80,24 +84,19 @@ class LightningCLEVRClassifier(pl.LightningModule):
                                        nn.ReLU(),\
                                        nn.Linear(32, 11))
 
+    self.batch_size = batch_size
+    self.train_size, self.val_size, self.test_size = train_size, val_size, test_size
+    self.num_train_batches = math.ceil(1.0 * self.train_size / self.batch_size)
+    self.num_val_batches = math.ceil(1.0 * self.val_size / self.batch_size)
+    self.num_test_batches = math.ceil(1.0 * self.test_size / self.batch_size)
+
     # Initialize some variables used for reporting training and validation accuracies.
     self.best_val_loss = 1e6
     self.save_model_path = 'pickle_files/clevr_model_state_dict.pt'
+    self.step = 0
 
-  def forward(self, x):
-    x = self.conv1(x)
-    x = self.bn1(x)
-    x = self.relu(x)
-    x = self.maxpool(x)
-    x = self.layer1(x)
-    x = self.layer2(x)
-    x = self.layer3(x)
-    x = self.layer4(x)
-
-    x = self.avgpool(x)
-    x = x.reshape(x.shape[0], -1)
-
-    return self.cube_layers(x), self.cylinder_layers(x), self.sphere_layers(x)
+    self.train_cube_correct, self.train_cylinder_correct, self.train_sphere_correct = 0, 0, 0
+    self.val_cube_correct, self.val_cylinder_correct, self.val_sphere_correct = 0, 0, 0
 
   def _make_layer(self, num_residual_blocks, intermediate_channels, stride):
     identity_downsample = None
@@ -124,6 +123,21 @@ class LightningCLEVRClassifier(pl.LightningModule):
 
     return nn.Sequential(*layers)
   
+  def forward(self, x):
+    x = self.conv1(x)
+    x = self.bn1(x)
+    x = self.relu(x)
+    x = self.maxpool(x)
+    x = self.layer1(x)
+    x = self.layer2(x)
+    x = self.layer3(x)
+    x = self.layer4(x)
+
+    x = self.avgpool(x)
+    x = x.reshape(x.shape[0], -1)
+
+    return self.cube_layers(x), self.cylinder_layers(x), self.sphere_layers(x)
+  
   def configure_optimizers(self):
     # Pass in self.parameters(), since the LightningModule IS the model.
     optimizer = optim.SGD(self.parameters(), lr=LR, momentum=MOMENTUM)
@@ -140,19 +154,58 @@ class LightningCLEVRClassifier(pl.LightningModule):
            self.cross_entropy_loss(cylinder_preds, cylinder_labels) + \
            self.cross_entropy_loss(sphere_preds, sphere_labels)
     self.log('train_loss', loss)
+    self.step += 1
+    
+    # Update the number of training correct.
+    self.train_cube_correct += get_num_correct(cube_preds, cube_labels)
+    self.train_cylinder_correct += get_num_correct(cylinder_preds, cylinder_labels)
+    self.train_sphere_correct += get_num_correct(sphere_preds, sphere_labels)
+
+    # If we reach the end of one epoch, log accuracies and zero out the number of correct.
+    if batch_idx == self.num_train_batches - 1:
+      print(f"Logging Training Accuracy at train_batch {batch_idx}")
+      cube_acc = round(self.train_cube_correct/self.train_size, 6)
+      cylinder_acc = round(self.train_cylinder_correct/self.train_size, 6)
+      sphere_acc = round(self.train_sphere_correct/self.train_size, 6)
+      self.logger.experiment.log_metric("train_cube_acc", cube_acc, step=self.step)
+      self.logger.experiment.log_metric("train_cylinder_acc", cylinder_acc, step=self.step)
+      self.logger.experiment.log_metric("train_sphere_acc", sphere_acc, step=self.step)
+
+      # Reset the number of training correct.
+      self.train_cube_correct, self.train_cylinder_correct, self.train_sphere_correct = 0, 0, 0
+
     return loss
 
   def validation_step(self, val_batch, batch_idx):
-    inputs, labels = val_batch
-    cube_labels, cylinder_labels, sphere_labels = labels[:,0], labels[:,1], labels[:,2]
-    cube_preds, cylinder_preds, sphere_preds = self.forward(inputs)
-    loss = self.cross_entropy_loss(cube_preds, cube_labels) + \
-           self.cross_entropy_loss(cylinder_preds, cylinder_labels) + \
-           self.cross_entropy_loss(sphere_preds, sphere_labels)
-    self.log('val_loss', loss)
-    if loss < self.best_val_loss:
-      self.best_val_loss = loss
-      torch.save(self.state_dict(), self.save_model_path)
+    with self.logger.experiment.validate():
+      inputs, labels = val_batch
+      cube_labels, cylinder_labels, sphere_labels = labels[:,0], labels[:,1], labels[:,2]
+      cube_preds, cylinder_preds, sphere_preds = self.forward(inputs)
+      loss = self.cross_entropy_loss(cube_preds, cube_labels) + \
+            self.cross_entropy_loss(cylinder_preds, cylinder_labels) + \
+            self.cross_entropy_loss(sphere_preds, sphere_labels)
+      self.log('val_loss', loss)
+      if loss < self.best_val_loss:
+        self.best_val_loss = loss
+        torch.save(self.state_dict(), self.save_model_path)
+
+      # Update the number of validation correct.
+      self.val_cube_correct += get_num_correct(cube_preds, cube_labels)
+      self.val_cylinder_correct += get_num_correct(cylinder_preds, cylinder_labels)
+      self.val_sphere_correct += get_num_correct(sphere_preds, sphere_labels)
+
+      if batch_idx == self.num_val_batches - 1:
+        print(f"Logging Validation Accuracy at val_batch {batch_idx}")
+        cube_acc = round(self.val_cube_correct/self.val_size, 6)
+        cylinder_acc = round(self.val_cylinder_correct/self.val_size, 6)
+        sphere_acc = round(self.val_sphere_correct/self.val_size, 6)
+        self.logger.experiment.log_metric("cube_acc", cube_acc, step=self.step)
+        self.logger.experiment.log_metric("cylinder_acc", cylinder_acc, step=self.step)
+        self.logger.experiment.log_metric("sphere_acc", sphere_acc, step=self.step)
+
+        # Reset the number of validation correct.
+        self.val_cube_correct, self.val_cylinder_correct, self.val_sphere_correct = 0, 0, 0
+
 
 # Testing code below.
 # def MiniResNet18(img_channel=3):
