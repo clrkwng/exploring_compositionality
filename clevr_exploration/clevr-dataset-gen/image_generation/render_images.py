@@ -64,6 +64,10 @@ parser.add_argument('--shape_color_combos_json', default=None,
     help="Optional path to a JSON file mapping shape names to a list of " +
          "allowed color names for that shape. This allows rendering images " +
          "for CLEVR-CoGenT.")
+parser.add_argument('--disallowed_combos_json', default=None,
+    help="Optional path to a JSON file containing pairs of disallowed object " +
+         "property pairs. For instance, adding the pair: ('yellow', 'cylinder')" + 
+         "will exclude any yellow cylinders from being generated.")
 
 # Settings for objects
 parser.add_argument('--min_objects', default=3, type=int,
@@ -155,16 +159,32 @@ parser.add_argument('--render_tile_size', default=256, type=int,
          "while larger tile sizes may be optimal for GPU-based rendering.")
 
 # Returns the number of certain property allowed, as defined in properties_json.
-def get_num_property(args, prop):
-  with open(args.properties_json, 'r') as f:
+def get_num_property(json_path, prop):
+  with open(json_path, 'r') as f:
     properties = json.load(f)
   return len(properties[prop].items())
 
-# poss_num_obj is the possible tuples that we will sample num_objects from.
+# Returns list of set of combos that aren't allowed.
+def process_disallowed_combos(json_path):
+  with open(json_path, 'r') as f:
+    combos = json.load(f)
+  return [set(c) for c in combos]
+
+# Returns if any combo of the given attributes of the object are disallowed.
+def obj_has_conflict(size_name, obj_name_out, mat_name_out, color_name):
+  obj_set = set([size_name, obj_name_out, mat_name_out, color_name])
+  for combo in DISALLOWED_LIST:
+    if combo.issubset(obj_set):
+      return True
+  return False
+
 # These global variables are set up in main method.
 NUM_SHAPES = 0
 NUM_OBJ_TUPLES = 0
+# POSS_NUM_OBJ is the possible tuples that we will sample num_objects from.
 POSS_NUM_OBJ = 0
+# DISALLOWED_LIST is map returned from process_disallowed_combos.
+DISALLOWED_LIST = []
 
 def main(args):
   num_digits = 6
@@ -185,13 +205,17 @@ def main(args):
 
   # Set up the global variables.
   global NUM_SHAPES
-  NUM_SHAPES = get_num_property(args, 'shapes')
+  NUM_SHAPES = get_num_property(args.properties_json, 'shapes')
 
   global NUM_OBJ_TUPLES
   NUM_OBJ_TUPLES = [e for e in product(range(0,11), repeat=NUM_SHAPES)]
   
   global POSS_NUM_OBJ
   POSS_NUM_OBJ = [x for x in NUM_OBJ_TUPLES if sum(x) <= 10]
+
+  if args.disallowed_combos_json is not None:
+    global DISALLOWED_LIST
+    DISALLOWED_LIST = process_disallowed_combos(args.disallowed_combos_json)
   
   all_scene_paths = []
   for i in range(args.num_images):
@@ -231,8 +255,6 @@ def main(args):
   }
   with open(args.output_scene_file, 'w') as f:
     json.dump(output, f)
-
-
 
 def render_scene(args,
     # num_objects=5,
@@ -428,6 +450,7 @@ def add_random_objects(scene_struct, num_objects, args, camera):
     if shape_color_combos is None:
       # Need to change this line to just choose one of the pre-chosen shapes.
       # obj_name, obj_name_out = random.choice(object_mapping)
+      # Here, obj_name_out is "cube", "sphere", or "cylinder"
       obj_name, obj_name_out = chosen_objects[i]
       color_name, rgba = random.choice(list(color_name_to_rgba.items()))
     else:
@@ -435,6 +458,18 @@ def add_random_objects(scene_struct, num_objects, args, camera):
       color_name = random.choice(color_choices)
       obj_name = [k for k, v in object_mapping if v == obj_name_out][0]
       rgba = color_name_to_rgba[color_name]
+
+    # Get a random material
+    mat_name, mat_name_out = random.choice(material_mapping)
+
+    # Here, check if any of the chosen properties are disallowed.
+    # If so, then keep randomly selecting again until no pair is disallowed.
+    # Unfortunately, this will remove any guarantees about the distribution of labels.
+    while obj_has_conflict(size_name, obj_name_out, mat_name_out, color_name):
+      size_name, r = random.choice(size_mapping)
+      obj_name, obj_name_out = random.choice(object_mapping)
+      mat_name, mat_name_out = random.choice(material_mapping)
+      color_name, rgba = random.choice(list(color_name_to_rgba.items()))
 
     # For cube, adjust the size a bit
     if obj_name == 'Cube':
@@ -449,8 +484,7 @@ def add_random_objects(scene_struct, num_objects, args, camera):
     blender_objects.append(obj)
     positions.append((x, y, r))
 
-    # Attach a random material
-    mat_name, mat_name_out = random.choice(material_mapping)
+    # Attach the chosen material and color.
     utils.add_material(mat_name, Color=rgba)
 
     # Record data about the object in the scene data structure
