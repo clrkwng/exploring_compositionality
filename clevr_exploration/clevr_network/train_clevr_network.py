@@ -112,7 +112,7 @@ def main():
 	valid_dataset = CLEVRDataset('../clevr-dataset-gen/output/val/')
 	valid_loader = torch.utils.data.DataLoader(dataset=valid_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-	save_model_path = 'pickle_files/clevr_model_state_dict.pt'
+	save_model_path = 'data/clevr_model_state_dict.pt'
 	num_epochs = 5000
 
 	train(model, criterion, optimizer, train_loader, valid_loader, save_model_path, num_epochs)

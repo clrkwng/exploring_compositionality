@@ -92,7 +92,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
 
     # Initialize some variables used for reporting training and validation accuracies.
     self.best_val_loss = 1e6
-    self.save_model_path = 'pickle_files/clevr_model_state_dict.pt'
+    self.save_model_path = 'data/clevr_model_state_dict.pt'
     self.step = 0
 
     self.train_cube_correct, self.train_cylinder_correct, self.train_sphere_correct = 0, 0, 0

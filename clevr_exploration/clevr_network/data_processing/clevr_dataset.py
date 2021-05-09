@@ -37,8 +37,10 @@ class CLEVRDataset(Dataset):
 		im = np.asarray(im).copy() # This makes it available to be modified.
 		im = self.transform(im)
 
+		# The label is based on what is specified in task_properties.json.
+		# Can look at LABEL_FORMAT_LST to see what each label means.
 		label_path = self.label_path + f"CLEVR_new_{str(index).zfill(6)}.json"
-		label = parse_objects_from_json(label_path)
+		label = get_image_labels(label_path)
 		return (im, label)
 
 	def __len__(self):
