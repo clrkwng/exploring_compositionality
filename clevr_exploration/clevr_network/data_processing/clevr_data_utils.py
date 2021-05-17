@@ -67,9 +67,9 @@ def get_image_labels(json_path, specific_attributes_flag):
   global LABEL_FORMAT_LST
 
   # Opening task_properties.json and properties.json files.
-  with open('../data/task_properties.json', 'r') as f:
+  with open('data/task_properties.json', 'r') as f:
     task_properties = json.load(f)  
-  with open('../../clevr-dataset-gen/image_generation/data/properties.json', 'r') as f:
+  with open('../clevr-dataset-gen/image_generation/data/properties.json', 'r') as f:
     properties = json.load(f)
 
   # If LABEL_FORMAT_LST hasn't been instantiated yet, then populate it.

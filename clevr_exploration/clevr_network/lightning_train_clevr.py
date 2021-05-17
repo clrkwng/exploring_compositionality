@@ -9,7 +9,7 @@ sys.path.insert(0, 'data_processing/')
 from clevr_dataloader import *
 sys.path.pop(0)
 sys.path.insert(0, 'model/')
-from lightning_comp_task_model import *
+from lightning_comp_2_task_model import *
 sys.path.pop(0)
 
 import pytorch_lightning as pl
@@ -19,8 +19,8 @@ def main():
 	comet_logger = CometLogger(
 		api_key='5zqkkwKFbkhDgnFn7Alsby6py',
 		workspace='clrkwng',
-		project_name='clevr-network',
-		experiment_name='lightning',
+		project_name='clevr-properties',
+		experiment_name='2_embedding',
 	)
 
 	# Grabs the number of images used in train, val, test.
@@ -34,12 +34,11 @@ def main():
 																	 batch_size=BATCH_SIZE,
 																	 train_size=train_size,
 																	 val_size=val_size,
-																	 test_size=test_size,
-																	 output_size=48) #TODO: Get rid of this hardcoding of the output_size.
+																	 test_size=test_size)
 	trainer = pl.Trainer(
 		gpus=1,
 		profiler=True,
-		# logger=comet_logger,
+		logger=comet_logger,
 		check_val_every_n_epoch=1,
 		max_epochs=100,
 	)

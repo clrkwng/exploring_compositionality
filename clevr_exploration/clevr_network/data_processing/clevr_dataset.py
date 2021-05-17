@@ -21,6 +21,10 @@ class CLEVRDataset(Dataset):
 		self.label_path = f"{folder_path}scenes/"
 
 		self.transform = transforms.Compose([
+			# transforms.ToPILImage(),
+			# transforms.RandomHorizontalFlip(p=0.5),
+			# transforms.RandomVerticalFlip(p=0.5),
+			# transforms.RandomRotation(degrees=30),
 			transforms.ToTensor(),
 			transforms.Normalize(
 				mean=[0.47035027, 0.46635654, 0.45921228],
