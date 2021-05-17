@@ -52,9 +52,9 @@ def train(model, criterion, optimizer, train_loader, valid_loader, save_model_pa
 				loss.backward()
 				optimizer.step()
 
-				cube_correct += get_num_correct(cube_preds, cube_labels)
-				cylinder_correct += get_num_correct(cylinder_preds, cylinder_labels)
-				sphere_correct += get_num_correct(sphere_preds, sphere_labels)
+				cube_correct += single_label_get_num_correct(cube_preds, cube_labels)
+				cylinder_correct += single_label_get_num_correct(cylinder_preds, cylinder_labels)
+				sphere_correct += single_label_get_num_correct(sphere_preds, sphere_labels)
 				train_total += labels.size(0)
 				total_loss += loss.item()
 
@@ -80,9 +80,9 @@ def train(model, criterion, optimizer, train_loader, valid_loader, save_model_pa
 								val_cube_labels, val_cylinder_labels, val_sphere_labels = val_labels[:,0].cuda(), val_labels[:,1].cuda(), val_labels[:,2].cuda()
 								val_cube_preds, val_cylinder_preds, val_sphere_preds = model(val_inputs)
 
-								val_cube_correct += get_num_correct(val_cube_preds, val_cube_labels)
-								val_cylinder_correct += get_num_correct(val_cylinder_preds, val_cylinder_labels)
-								val_sphere_correct += get_num_correct(val_sphere_preds, val_sphere_labels)
+								val_cube_correct += single_label_get_num_correct(val_cube_preds, val_cube_labels)
+								val_cylinder_correct += single_label_get_num_correct(val_cylinder_preds, val_cylinder_labels)
+								val_sphere_correct += single_label_get_num_correct(val_sphere_preds, val_sphere_labels)
 
 							val_cube_acc = round(val_cube_correct/len(valid_loader), 6)
 							val_cylinder_acc = round(val_cylinder_correct/len(valid_loader), 6)

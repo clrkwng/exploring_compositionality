@@ -9,10 +9,9 @@ sys.path.insert(0, 'data_processing/')
 from clevr_dataloader import *
 sys.path.pop(0)
 sys.path.insert(0, 'model/')
-from lightning_model import *
+from lightning_comp_task_model import *
 sys.path.pop(0)
 
-import torch
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import CometLogger
 
@@ -28,18 +27,19 @@ def main():
 	train_size = len([n for n in os.listdir('../clevr-dataset-gen/output/train/images/')])
 	val_size = len([n for n in os.listdir('../clevr-dataset-gen/output/val/images/')])
 	test_size = len([n for n in os.listdir('../clevr-dataset-gen/output/test/images/')])
-
-	data_module = CLEVRDataModule()
+	BATCH_SIZE = 256
+	data_module = CLEVRDataModule('../clevr-dataset-gen/output/', BATCH_SIZE, False)
 	model = LightningCLEVRClassifier(layers=[1, 1, 1, 1], 
 																	 image_channels=3, 
 																	 batch_size=BATCH_SIZE,
 																	 train_size=train_size,
 																	 val_size=val_size,
-																	 test_size=test_size)
+																	 test_size=test_size,
+																	 output_size=48) #TODO: Get rid of this hardcoding of the output_size.
 	trainer = pl.Trainer(
 		gpus=1,
 		profiler=True,
-		logger=comet_logger,
+		# logger=comet_logger,
 		check_val_every_n_epoch=1,
 		max_epochs=100,
 	)

@@ -14,7 +14,7 @@ import torchvision.transforms as transforms
 from clevr_data_utils import *
 
 class CLEVRDataset(Dataset):
-	def __init__(self, folder_path):
+	def __init__(self, folder_path, specific_attributes_flag):
 		self.image_path = f"{folder_path}images/"
 		self.data_len = len(glob.glob(self.image_path + "*"))
 
@@ -28,6 +28,8 @@ class CLEVRDataset(Dataset):
 			),
 		])
 
+		self.specific_attributes_flag = specific_attributes_flag
+
 	def __getitem__(self, index):
 		if torch.is_tensor(index):
 			index = index.tolist()
@@ -40,7 +42,7 @@ class CLEVRDataset(Dataset):
 		# The label is based on what is specified in task_properties.json.
 		# Can look at LABEL_FORMAT_LST to see what each label means.
 		label_path = self.label_path + f"CLEVR_new_{str(index).zfill(6)}.json"
-		label = get_image_labels(label_path)
+		label = get_image_labels(label_path, self.specific_attributes_flag)
 		return (im, label)
 
 	def __len__(self):
