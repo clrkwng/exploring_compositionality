@@ -20,7 +20,7 @@ def main():
 		api_key='5zqkkwKFbkhDgnFn7Alsby6py',
 		workspace='clrkwng',
 		project_name='clevr-properties',
-		experiment_name='2_embedding',
+		experiment_name='data_aug',
 	)
 
 	# Grabs the number of images used in train, val, test.
@@ -40,7 +40,7 @@ def main():
 		profiler=True,
 		logger=comet_logger,
 		check_val_every_n_epoch=1,
-		max_epochs=100,
+		max_epochs=200,
 	)
 	trainer.fit(model, data_module)
 

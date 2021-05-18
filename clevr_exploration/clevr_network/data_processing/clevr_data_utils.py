@@ -13,7 +13,7 @@ NUM_CHANNELS = 3
 LABEL_FORMAT_LST = []
 
 # Returns np.array of [num_cubes, num_cylinders, num_spheres] from json_path.
-# This serves as the label for each image in CLEVRDataset.
+# Used to serve as the label for each image in CLEVRDataset.
 def parse_num_objects_from_json(json_path):
   with open(json_path, 'r') as f:
     data = json.load(f)

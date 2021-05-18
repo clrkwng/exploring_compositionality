@@ -18,9 +18,11 @@ class CLEVRDataModule(pl.LightningDataModule):
 		self.specific_attributes_flag = specific_attributes_flag
 
 	def setup(self, stage):
-		self.clevr_dataset_train = CLEVRDataset(self.data_dir + 'train/', self.specific_attributes_flag)
-		self.clevr_dataset_val = CLEVRDataset(self.data_dir + 'val/', self.specific_attributes_flag)
-		self.clevr_dataset_test = CLEVRDataset(self.data_dir + 'test/', self.specific_attributes_flag)
+		# We use the data augmentations for the training data, but val / test do not use them.
+		self.clevr_dataset_train = CLEVRDataset(folder_path=self.data_dir + 'train/', specific_attributes_flag=self.specific_attributes_flag, train_flag=True)
+		self.clevr_dataset_val = CLEVRDataset(folder_path=self.data_dir + 'val/', specific_attributes_flag=self.specific_attributes_flag, train_flag=False)
+		self.clevr_dataset_test = CLEVRDataset(folder_path=self.data_dir + 'test/', specific_attributes_flag=self.specific_attributes_flag, train_flag=False)
+		print(f"Train dataset size: {len(self.clevr_dataset_train)}")
 
 	# These are responsible for returning the appropriate data split.
 	def train_dataloader(self):

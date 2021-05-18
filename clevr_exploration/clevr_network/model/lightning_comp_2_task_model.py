@@ -191,8 +191,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
     logits = logits.float()
     labels = labels.float()
     criterion = torch.nn.BCEWithLogitsLoss()
-    val = criterion(logits, labels)
-    return val
+    return criterion(logits, labels)
 
   # Based on task_properties, split labels/preds into an appropriate tuple.
   # NOTE: lbls is 2-dimensional, based on batch size.
