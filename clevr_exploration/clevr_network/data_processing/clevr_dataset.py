@@ -4,9 +4,7 @@ a CLEVR array with label of (num_cubes, num_cylinders, num_spheres).
 Each CLEVR array is (256x256x3), where 3 channels are RGB.
 """
 
-import glob
-
-import torch
+import glob, torch
 # According to documentation, need to set seed for torch random generator.
 torch.manual_seed(17)
 
@@ -18,8 +16,8 @@ import torchvision.transforms as transforms
 from clevr_data_utils import *
 
 # These were determined from 10,000 CLEVR images.
-RGB_MEAN = [0.47035027, 0.46635654, 0.45921228]
-RGB_STD = [0.09705831, 0.09378762, 0.09461603]
+RGB_MEAN = load_pickle("../data/rgb_mean.pickle")
+RGB_STD = load_pickle("../data/rgb_std.pickle")
 
 class CLEVRDataset(Dataset):
 	def __init__(self, folder_path, specific_attributes_flag, train_flag):
@@ -55,6 +53,10 @@ class CLEVRDataset(Dataset):
 		# If True, will be using 2n embedding, else using 2 embedding.
 		self.specific_attributes_flag = specific_attributes_flag
 
+	def __len__(self):
+		# Note: can hardcode the length that is returned here, to restrict which data is returned.
+		return self.data_len
+		
 	def __getitem__(self, index):
 		if torch.is_tensor(index):
 			index = index.tolist()
@@ -69,7 +71,3 @@ class CLEVRDataset(Dataset):
 		label_path = self.label_path + f"CLEVR_new_{str(index).zfill(6)}.json"
 		label = get_image_labels(label_path, self.specific_attributes_flag)
 		return (im, label)
-
-	def __len__(self):
-		# Note: can hardcode the length that is returned here, to restrict which data is returned.
-		return self.data_len

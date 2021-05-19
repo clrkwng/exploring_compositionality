@@ -2,7 +2,7 @@
 This file provides different methods that are used across the CLEVR dataset exploration.
 """
 
-import glob, json, torch, itertools
+import glob, json, itertools
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
@@ -10,7 +10,6 @@ from tqdm import tqdm
 from utils import *
 
 NUM_CHANNELS = 3
-LABEL_FORMAT_LST = []
 
 # Returns np.array of [num_cubes, num_cylinders, num_spheres] from json_path.
 # Used to serve as the label for each image in CLEVRDataset.
@@ -64,34 +63,33 @@ def parse_obj_properties_from_json(json_path, task_properties, specific_attribut
 
 # Get the labels, based on what is in task_properties.json. 
 def get_image_labels(json_path, specific_attributes_flag):
-  global LABEL_FORMAT_LST
+  label_format_lst = []
 
   # Opening task_properties.json and properties.json files.
+  # Change this pathing, depending on if testing in Jupyter Notebook or not.
   with open('data/task_properties.json', 'r') as f:
     task_properties = json.load(f)  
   with open('../clevr-dataset-gen/image_generation/data/properties.json', 'r') as f:
     properties = json.load(f)
 
-  # If LABEL_FORMAT_LST hasn't been instantiated yet, then populate it.
-  if len(LABEL_FORMAT_LST) == 0:
-    attribute_lst = [[k for k, _ in properties[prop].items()] for prop in task_properties]
-    if specific_attributes_flag:
-      # Generate the list of label formats. This one supports the "2|B|" embedding label.
-      LABEL_FORMAT_LST = list(itertools.product(*attribute_lst))
-    else:
-      # Generate list of label formats. This one supports the "|B|" embedding label.
-      LABEL_FORMAT_LST = [attribute for prop_list in attribute_lst for attribute in prop_list]
+  attribute_lst = [[k for k, _ in properties[prop].items()] for prop in task_properties]
+  if specific_attributes_flag:
+    # Generate the list of label formats. This one supports the "2|B|" embedding label.
+    label_format_lst = list(itertools.product(*attribute_lst))
+  else:
+    # Generate list of label formats. This one supports the "|B|" embedding label.
+    label_format_lst = [attribute for prop_list in attribute_lst for attribute in prop_list]
   
-  label_vec = [0] * len(LABEL_FORMAT_LST)
+  label_vec = [0] * len(label_format_lst)
   obj_map = parse_obj_properties_from_json(json_path, task_properties, specific_attributes_flag)
   # For now, label_vec is just a boolean vector (denoting presence of a certain tuple or not).
   # TODO: When looking at presence of N > 1 objects, change the label_vec value to be val of obj_map.
-  for i in range(len(LABEL_FORMAT_LST)):
-    if LABEL_FORMAT_LST[i] in obj_map:
+  for i in range(len(label_format_lst)):
+    if label_format_lst[i] in obj_map:
       label_vec[i] = 1
   return np.array(label_vec)
 
-# Takes a CUDA tensor, returns a numpy.
+# Takes a CUDA tensor, returns it in numpy.
 def tensor_to_numpy(tnsr):
   return tnsr.detach().cpu().numpy()
 
@@ -140,4 +138,4 @@ def vector_label_get_num_correct(preds, labels):
   count_correct = (labels == preds).float().sum(1)
 
   # This gets the number of preds that are completely equal to labels.
-  return (count_correct == labels.shape[1]).float().sum().item()
+  return int((count_correct == labels.shape[1]).float().sum().item())

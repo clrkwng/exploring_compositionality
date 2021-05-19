@@ -4,8 +4,7 @@ This model is used to handle compositionality tasks.
 """
 from comet_ml import Experiment
 
-import math
-import json
+import math, json
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,6 +19,7 @@ sys.path.pop(0)
 LR = 1e-2
 MOMENTUM = 0.9
 
+# This code creates a residual block used in ResNets.
 class ResBlock(pl.LightningModule):
   def __init__(self, in_channels, intermediate_channels, identity_downsample=None, stride=1):
     super().__init__()
@@ -59,7 +59,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
     # Grab the properties we want to output from the model.
     # It is up to the user to input the properties in order, as denoted in properties.json.
     with open('data/task_properties.json', 'r') as f:
-      task_properties = json.load(f)
+      task_properties = set(json.load(f))
       
     self.shape_flag = "shapes" in task_properties
     self.color_flag = "colors" in task_properties
@@ -193,7 +193,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
     criterion = torch.nn.BCEWithLogitsLoss()
     return criterion(logits, labels)
 
-  # Based on task_properties, split labels/preds into an appropriate tuple.
+  # Based on task_properties, split labels into an appropriate tuple.
   # NOTE: lbls is 2-dimensional, based on batch size.
   def split_lbl_by_properties(self, lbls):
     return_lst = []
@@ -237,7 +237,9 @@ class LightningCLEVRClassifier(pl.LightningModule):
       idx += 1
     
     assert idx == len(labels), "Not all the properties were accounted for."
-    return losses
+
+		# This summing will still keep the gradient fn.
+    return sum(losses)
 
   # Update train/val accuracies, based on train_flag's value.
   # NOTE: This method is to be called after using split_lbl_by_properties.
@@ -275,10 +277,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
     preds = self.forward(inputs)
     
     # Call this loss helper method on the split labels and preds.
-    losses = self.get_loss_by_properties(preds=preds, labels=labels)
-
-    # This summing still keeps the gradient fn of the tensor.
-    loss = sum(losses)
+    loss = self.get_loss_by_properties(preds=preds, labels=labels)
 
     self.log('train_loss', loss)
     self.step += 1
@@ -318,8 +317,8 @@ class LightningCLEVRClassifier(pl.LightningModule):
       preds = self.forward(inputs)
 
       # Call this loss helper method on the split labels and preds.
-      losses = self.get_loss_by_properties(preds=preds, labels=labels)
-      loss = sum(losses)
+      loss = self.get_loss_by_properties(preds=preds, labels=labels)
+
       self.log('val_loss', loss)
       if loss < self.best_val_loss:
         self.best_val_loss = loss
@@ -334,17 +333,17 @@ class LightningCLEVRClassifier(pl.LightningModule):
         # Log and reset the number of validation correct.
         if self.shape_flag:
           shape_val_acc = round(self.shape_val_correct/self.val_size, 6)
-          self.logger.experiment.log_metric("shape_val_acc", shape_val_acc, step=self.step)
+          self.logger.experiment.log_metric("shape_acc", shape_val_acc, step=self.step)
           self.shape_val_correct = 0
         if self.color_flag:
           color_val_acc = round(self.color_val_correct/self.val_size, 6)
-          self.logger.experiment.log_metric("color_val_acc", color_val_acc, step=self.step)
+          self.logger.experiment.log_metric("color_acc", color_val_acc, step=self.step)
           self.color_val_correct = 0
         if self.material_flag:
           material_val_acc = round(self.material_val_correct/self.val_size, 6)
-          self.logger.experiment.log_metric("material_val_acc", material_val_acc, step=self.step)
+          self.logger.experiment.log_metric("material_acc", material_val_acc, step=self.step)
           self.material_val_correct = 0
         if self.size_flag:
           size_val_acc = round(self.size_val_correct/self.val_size, 6)
-          self.logger.experiment.log_metric("size_val_acc", size_val_acc, step=self.step)
+          self.logger.experiment.log_metric("size_acc", size_val_acc, step=self.step)
           self.size_val_correct = 0
