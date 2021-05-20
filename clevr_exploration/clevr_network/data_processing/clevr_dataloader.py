@@ -2,6 +2,8 @@
 This is a DataModule used for training with a PyTorch Lightning Trainer.
 """
 
+import torch
+import numpy as np
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 
@@ -26,10 +28,28 @@ class CLEVRDataModule(pl.LightningDataModule):
 
 	# These are responsible for returning the appropriate data split.
 	def train_dataloader(self):
-		return DataLoader(self.clevr_dataset_train, batch_size=self.batch_size)
+		return DataLoader(dataset=self.clevr_dataset_train, batch_size=self.batch_size, shuffle=True, collate_fn=self.my_collate)
 
 	def val_dataloader(self):
-		return DataLoader(self.clevr_dataset_val, batch_size=self.batch_size)
+		return DataLoader(dataset=self.clevr_dataset_val, shuffle=True, batch_size=self.batch_size)
 
 	def test_dataloader(self):
-		return DataLoader(self.clevr_dataset_test, batch_size=self.batch_size)
+		return DataLoader(dataset=self.clevr_dataset_test, shuffle=True, batch_size=self.batch_size)
+
+	# Custom collate function to be passed into DataLoader.
+	# To be only used with train dataset.
+	def my_collate(self, batch):
+		len_batch = len(batch)
+
+		# Filter out the None values from the batch.
+		batch = list(filter(lambda x: x is not None, batch))
+		if len_batch > len(batch):
+			len_diff = len_batch - len(batch)
+			while len_diff != 0:
+				poss_val = self.clevr_dataset_train[np.random.randint(0, len(self.clevr_dataset_train))]
+				if poss_val is None:
+					continue
+				batch.append(poss_val)
+				len_diff -= 1
+
+		return torch.utils.data.dataloader.default_collate(batch)

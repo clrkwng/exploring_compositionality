@@ -15,10 +15,6 @@ import torchvision.transforms as transforms
 
 from clevr_data_utils import *
 
-# These were determined from 10,000 CLEVR images.
-RGB_MEAN = load_pickle("../data/rgb_mean.pickle")
-RGB_STD = load_pickle("../data/rgb_std.pickle")
-
 class CLEVRDataset(Dataset):
 	def __init__(self, folder_path, specific_attributes_flag, train_flag):
 		self.image_path = f"{folder_path}images/"
@@ -26,8 +22,13 @@ class CLEVRDataset(Dataset):
 
 		self.label_path = f"{folder_path}scenes/"
 
+		# These were determined from 10,000 CLEVR images.
+		RGB_MEAN = load_pickle("data/rgb_mean.pickle")
+		RGB_STD = load_pickle("data/rgb_std.pickle")
+
 		# If in training mode, use a different set of data augmentation.
-		if train_flag:
+		self.train_flag = train_flag
+		if self.train_flag:
 			self.transform = transforms.Compose([
 				transforms.ToPILImage(),
 				transforms.RandomHorizontalFlip(p=0.5),
@@ -61,13 +62,21 @@ class CLEVRDataset(Dataset):
 		if torch.is_tensor(index):
 			index = index.tolist()
 
+		# The label is based on what is specified in task_properties.json.
+		# Can look at LABEL_FORMAT_LST to see what each label means.
+		label_path = self.label_path + f"CLEVR_new_{str(index).zfill(6)}.json"
+
+		# If the image contains a disallowed combo, then we reject it.
+		# This will be cleaned up in the collate_fn, defined in clevr_dataloader.py.
+		# Only do this for train dataset.
+		if self.train_flag and scene_has_disallowed_combo(label_path):
+			return None
+
+		label = get_image_labels(label_path, self.specific_attributes_flag)
+
 		single_image_path = self.image_path + f"CLEVR_new_{str(index).zfill(6)}.png"
 		im = Image.open(single_image_path).convert('RGB') # Convert RGBA -> RGB.
 		im = np.asarray(im).copy() # This makes it available to be modified.
 		im = self.transform(im)
 
-		# The label is based on what is specified in task_properties.json.
-		# Can look at LABEL_FORMAT_LST to see what each label means.
-		label_path = self.label_path + f"CLEVR_new_{str(index).zfill(6)}.json"
-		label = get_image_labels(label_path, self.specific_attributes_flag)
 		return (im, label)

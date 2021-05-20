@@ -238,7 +238,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
     
     assert idx == len(labels), "Not all the properties were accounted for."
 
-		# This summing will still keep the gradient fn.
+    # This summing will still keep the gradient fn.
     return sum(losses)
 
   # Update train/val accuracies, based on train_flag's value.

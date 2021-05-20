@@ -10,6 +10,7 @@ from tqdm import tqdm
 from utils import *
 
 NUM_CHANNELS = 3
+DISALLOWED_LIST = []
 
 # Returns np.array of [num_cubes, num_cylinders, num_spheres] from json_path.
 # Used to serve as the label for each image in CLEVRDataset.
@@ -88,6 +89,27 @@ def get_image_labels(json_path, specific_attributes_flag):
     if label_format_lst[i] in obj_map:
       label_vec[i] = 1
   return np.array(label_vec)
+
+# Returns True if the scene contains a disallowed combo, else False.
+def scene_has_disallowed_combo(json_path):
+  # Initialize DISALLOWED_LIST if it is empty.
+  global DISALLOWED_LIST
+  if len(DISALLOWED_LIST) == 0:
+    with open('../clevr-dataset-gen/image_generation/data/disallowed_combos.json', 'r') as f:
+      combos = json.load(f)
+    DISALLOWED_LIST = [set(c) for c in combos]
+
+  # Data is the map contained in json_path.
+  with open(json_path, 'r') as f:
+    data = json.load(f)
+
+  # Now, return True if any of the objects are disallowed.
+  for o in data["objects"]:
+    obj_set = set([o["shape"], o["color"], o["material"], o["size"]])
+    for combo in DISALLOWED_LIST:
+      if combo.issubset(obj_set):
+        return True
+  return False
 
 # Takes a CUDA tensor, returns it in numpy.
 def tensor_to_numpy(tnsr):
