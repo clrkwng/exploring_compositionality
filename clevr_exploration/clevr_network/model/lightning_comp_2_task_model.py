@@ -16,9 +16,6 @@ sys.path.insert(0, '../data_processing/')
 from clevr_data_utils import *
 sys.path.pop(0)
 
-LR = 1e-2
-MOMENTUM = 0.9
-
 # This code creates a residual block used in ResNets.
 class ResBlock(pl.LightningModule):
   def __init__(self, in_channels, intermediate_channels, identity_downsample=None, stride=1):
@@ -53,8 +50,11 @@ class ResBlock(pl.LightningModule):
     return x
 
 class LightningCLEVRClassifier(pl.LightningModule):
-  def __init__(self, layers, image_channels, batch_size, train_size, val_size, test_size):
+  def __init__(self, layers, image_channels, batch_size, train_size, val_size, test_size, lr, momentum):
     super().__init__()
+
+    self.lr = lr
+    self.momentum = momentum
 
     # Grab the properties we want to output from the model.
     # It is up to the user to input the properties in order, as denoted in properties.json.
@@ -85,7 +85,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
     # TODO: Need to change this hard-coding if we decide to use continuous properties.
     # Also, initialize the num_correct parameters for each property.
     if self.shape_flag:
-      self.shape_train_correct, self.shape_val_correct = 0, 0
+      self.shape_train_correct, self.shape_val_correct, self.shape_test_correct = 0, 0, 0
       self.shape_layers = nn.Sequential(nn.Linear(512, 256),\
                                       nn.ReLU(),\
                                       nn.Linear(256, 32),\
@@ -94,14 +94,14 @@ class LightningCLEVRClassifier(pl.LightningModule):
                                       nn.ReLU(),\
                                       nn.Linear(8, 3))
     if self.color_flag:
-      self.color_train_correct, self.color_val_correct = 0, 0
+      self.color_train_correct, self.color_val_correct, self.color_test_correct = 0, 0, 0
       self.color_layers = nn.Sequential(nn.Linear(512, 256),\
                                       nn.ReLU(),\
                                       nn.Linear(256, 32),\
                                       nn.ReLU(),\
                                       nn.Linear(32, 8))
     if self.material_flag:
-      self.material_train_correct, self.material_val_correct = 0, 0
+      self.material_train_correct, self.material_val_correct, self.material_test_correct = 0, 0, 0
       self.material_layers = nn.Sequential(nn.Linear(512, 256),\
                                       nn.ReLU(),\
                                       nn.Linear(256, 32),\
@@ -110,7 +110,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
                                       nn.ReLU(),\
                                       nn.Linear(8, 2))
     if self.size_flag:
-      self.size_train_correct, self.size_val_correct = 0, 0
+      self.size_train_correct, self.size_val_correct, self.size_test_correct = 0, 0, 0
       self.size_layers = nn.Sequential(nn.Linear(512, 256),\
                                       nn.ReLU(),\
                                       nn.Linear(256, 32),\
@@ -118,6 +118,10 @@ class LightningCLEVRClassifier(pl.LightningModule):
                                       nn.Linear(32, 8),\
                                       nn.ReLU(),\
                                       nn.Linear(8, 2))
+
+    # These are used to get the accuracy on the concatenated label.
+    # That is, the joint correctness of [shape, color, material, size].
+    self.concat_label_train_correct, self.concat_label_val_correct, self.concat_label_test_correct = 0, 0, 0
 
     self.batch_size = batch_size
     self.train_size, self.val_size, self.test_size = train_size, val_size, test_size
@@ -183,7 +187,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
   
   def configure_optimizers(self):
     # Pass in self.parameters(), since the LightningModule IS the model.
-    optimizer = optim.SGD(self.parameters(), lr=LR, momentum=MOMENTUM)
+    optimizer = optim.SGD(self.parameters(), lr=self.lr, momentum=self.momentum)
     return optimizer
 
   # Loss function used for this model is BCEWithLogitsLoss().
@@ -243,38 +247,56 @@ class LightningCLEVRClassifier(pl.LightningModule):
 
   # Update train/val accuracies, based on train_flag's value.
   # NOTE: This method is to be called after using split_lbl_by_properties.
-  def update_acc_by_properties(self, preds, labels, train_flag):
+  def update_acc_by_properties(self, preds, labels, eval_mode):
     assert len(labels) == len(preds), "Number of labels doesn't match preds."
 
     idx = 0
     if self.shape_flag:
       shape_correct = vector_label_get_num_correct(preds[idx], labels[idx])
       idx += 1
-      if train_flag: self.shape_train_correct += shape_correct
-      else: self.shape_val_correct += shape_correct
+      if eval_mode == "train": self.shape_train_correct += shape_correct
+      elif eval_mode == "val": self.shape_val_correct += shape_correct
+      elif eval_mode == "test": self.shape_test_correct += shape_correct
+      else:
+        print("Entered incorrect eval_mode.")
+        sys.exit(-1)
     if self.color_flag:
       color_correct = vector_label_get_num_correct(preds[idx], labels[idx])
       idx += 1
-      if train_flag: self.color_train_correct += color_correct
-      else: self.color_val_correct += color_correct
+      if eval_mode == "train": self.color_train_correct += color_correct
+      elif eval_mode == "val": self.color_val_correct += color_correct
+      elif eval_mode == "test": self.color_test_correct += color_correct
+      else:
+        print("Entered incorrect eval_mode.")
+        sys.exit(-1)
     if self.material_flag:
       material_correct = vector_label_get_num_correct(preds[idx], labels[idx])
       idx += 1
-      if train_flag: self.material_train_correct += material_correct
-      else: self.material_val_correct += material_correct
+      if eval_mode == "train": self.material_train_correct += material_correct
+      elif eval_mode == "val": self.material_val_correct += material_correct
+      elif eval_mode == "test": self.material_test_correct += material_correct
+      else:
+        print("Entered incorrect eval_mode.")
+        sys.exit(-1)
     if self.size_flag:
       size_correct = vector_label_get_num_correct(preds[idx], labels[idx])
       idx += 1
-      if train_flag: self.size_train_correct += size_correct
-      else: self.size_val_correct += size_correct
+      if eval_mode == "train": self.size_train_correct += size_correct
+      elif eval_mode == "val": self.size_val_correct += size_correct
+      elif eval_mode == "test": self.size_test_correct += size_correct
+      else:
+        print("Entered incorrect eval_mode.")
+        sys.exit(-1)
 
     assert idx == len(labels), "Not all the properties were accounted for."
 
   def training_step(self, train_batch, batch_idx):
-    inputs, labels = train_batch
-    labels = self.split_lbl_by_properties(labels)
+    inputs, concat_labels = train_batch
+    labels = self.split_lbl_by_properties(concat_labels)
 
     preds = self.forward(inputs)
+    # Now, the concat_preds and labels are the same dimensions.
+    concat_preds = torch.cat(preds, dim=1)
     
     # Call this loss helper method on the split labels and preds.
     loss = self.get_loss_by_properties(preds=preds, labels=labels)
@@ -283,7 +305,8 @@ class LightningCLEVRClassifier(pl.LightningModule):
     self.step += 1
     
     # Update the number of training correct.
-    self.update_acc_by_properties(preds=preds, labels=labels, train_flag=True)
+    self.update_acc_by_properties(preds=preds, labels=labels, eval_mode="train")
+    self.concat_label_train_correct += vector_label_get_num_correct(concat_preds, concat_labels)
 
     # If we reach the end of one epoch, log accuracies and zero out the number of correct.
     if batch_idx == self.num_train_batches - 1:
@@ -307,14 +330,20 @@ class LightningCLEVRClassifier(pl.LightningModule):
         self.logger.experiment.log_metric("size_train_acc", size_train_acc, step=self.step)
         self.size_train_correct = 0
 
+      concat_label_train_acc = round(self.concat_label_train_correct/self.train_size, 6)
+      self.logger.experiment.log_metric("concat_label_train_acc", concat_label_train_acc, step=self.step)
+      self.concat_label_train_correct = 0
+
     return loss
 
   def validation_step(self, val_batch, batch_idx):
     with self.logger.experiment.validate():
-      inputs, labels = val_batch
-      labels = self.split_lbl_by_properties(labels)
+      inputs, concat_labels = val_batch
+      labels = self.split_lbl_by_properties(concat_labels)
 
       preds = self.forward(inputs)
+      # Now, the concat_preds and labels are the same dimensions.
+      concat_preds = torch.cat(preds, dim=1)
 
       # Call this loss helper method on the split labels and preds.
       loss = self.get_loss_by_properties(preds=preds, labels=labels)
@@ -325,7 +354,8 @@ class LightningCLEVRClassifier(pl.LightningModule):
         torch.save(self.state_dict(), self.save_model_path)
 
       # Update the number of validation correct.
-      self.update_acc_by_properties(preds=preds, labels=labels, train_flag=False)
+      self.update_acc_by_properties(preds=preds, labels=labels, eval_mode="val")
+      self.concat_label_val_correct += vector_label_get_num_correct(concat_preds, concat_labels)
 
       if batch_idx == self.num_val_batches - 1:
         print(f"Logging Validation Accuracy at val_batch {batch_idx}")
@@ -347,3 +377,44 @@ class LightningCLEVRClassifier(pl.LightningModule):
           size_val_acc = round(self.size_val_correct/self.val_size, 6)
           self.logger.experiment.log_metric("size_acc", size_val_acc, step=self.step)
           self.size_val_correct = 0
+
+        concat_label_val_acc = round(self.concat_label_val_correct/self.val_size, 6)
+        self.logger.experiment.log_metric("concat_label_acc", concat_label_val_acc, step=self.step)
+        self.concat_label_val_correct = 0
+
+  def test_step(self, test_batch, batch_idx):
+    with self.logger.experiment.validate():
+      inputs, concat_labels = test_batch
+      labels = self.split_lbl_by_properties(concat_labels)
+
+      preds = self.forward(inputs)
+      # Now, the concat_preds and labels are the same dimensions.
+      concat_preds = torch.cat(preds, dim=1)
+
+      self.update_acc_by_properties(preds=preds, labels=labels, eval_mode="test")
+      self.concat_label_test_correct += vector_label_get_num_correct(concat_preds, concat_labels)
+
+      if batch_idx == self.num_test_batches - 1:
+        print(f"Logging Test Accuracy at test_batch {batch_idx}")
+
+        # Log and reset the number of validation correct.
+        if self.shape_flag:
+          shape_test_acc = round(self.shape_test_correct/self.test_size, 6)
+          self.logger.experiment.log_metric("test_shape_acc", shape_test_acc, step=self.step)
+          self.shape_test_correct = 0
+        if self.color_flag:
+          color_test_acc = round(self.color_test_correct/self.test_size, 6)
+          self.logger.experiment.log_metric("test_color_acc", color_test_acc, step=self.step)
+          self.color_test_correct = 0
+        if self.material_flag:
+          material_test_acc = round(self.material_test_correct/self.test_size, 6)
+          self.logger.experiment.log_metric("test_material_acc", material_test_acc, step=self.step)
+          self.material_test_correct = 0
+        if self.size_flag:
+          size_test_acc = round(self.size_test_correct/self.test_size, 6)
+          self.logger.experiment.log_metric("test_size_acc", size_test_acc, step=self.step)
+          self.size_test_correct = 0
+
+        concat_label_test_acc = round(self.concat_label_test_correct/self.test_size, 6)
+        self.logger.experiment.log_metric("test_concat_label_acc", concat_label_test_acc, step=self.step)
+        self.concat_label_test_correct = 0

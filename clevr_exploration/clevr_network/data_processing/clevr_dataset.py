@@ -30,10 +30,10 @@ class CLEVRDataset(Dataset):
 		self.train_flag = train_flag
 		if self.train_flag:
 			self.transform = transforms.Compose([
-				transforms.ToPILImage(),
-				transforms.RandomHorizontalFlip(p=0.5),
-				transforms.RandomVerticalFlip(p=0.5),
-				transforms.RandomRotation(degrees=30),
+				# transforms.ToPILImage(),
+				# transforms.RandomHorizontalFlip(p=0.5),
+				# transforms.RandomVerticalFlip(p=0.5),
+				# transforms.RandomRotation(degrees=30),
 				# transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
 				transforms.ToTensor(),
 				transforms.Normalize(

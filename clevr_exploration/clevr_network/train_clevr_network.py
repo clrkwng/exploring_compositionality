@@ -13,7 +13,7 @@ import math
 
 BATCH_SIZE = 256
 NUM_BATCHES = math.ceil(1.0 * 10000 / BATCH_SIZE)
-LR = 1e-2
+# LR = 1e-2
 MOMENTUM = 0.9
 
 experiment = Experiment(api_key='5zqkkwKFbkhDgnFn7Alsby6py', project_name='clevr-network', workspace='clrkwng')

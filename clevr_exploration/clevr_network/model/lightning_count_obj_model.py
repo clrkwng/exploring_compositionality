@@ -16,7 +16,7 @@ sys.path.insert(0, '../data_processing/')
 from clevr_data_utils import *
 sys.path.pop(0)
 
-LR = 1e-2
+# LR = 1e-2
 MOMENTUM = 0.9
 
 class ResBlock(pl.LightningModule):
