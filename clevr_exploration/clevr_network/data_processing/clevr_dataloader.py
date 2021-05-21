@@ -12,7 +12,7 @@ from clevr_dataset import *
 # DataModule makes data reusable and easy to share.
 class CLEVRDataModule(pl.LightningDataModule):
 	# ALl the code in Lightning makes sure that this method is called from ONLY one GPU.
-	def __init__(self, data_dir, batch_size, specific_attributes_flag):
+	def __init__(self, data_dir, batch_size, specific_attributes_flag, train_transforms):
 		super().__init__()
 		self.data_dir = data_dir
 		self.batch_size = batch_size
@@ -20,9 +20,11 @@ class CLEVRDataModule(pl.LightningDataModule):
 		# Flag is true for 2n embedding, else n embedding.
 		self.specific_attributes_flag = specific_attributes_flag
 
+		self.train_transforms = train_transforms
+
 	def setup(self, stage):
 		# We use the data augmentations for the training data, but val / test do not use them.
-		self.clevr_dataset_train = CLEVRDataset(folder_path=self.data_dir + 'train/', specific_attributes_flag=self.specific_attributes_flag, train_flag=True)
+		self.clevr_dataset_train = CLEVRDataset(folder_path=self.data_dir + 'train/', specific_attributes_flag=self.specific_attributes_flag, train_flag=True, train_transforms=self.train_transforms)
 		self.clevr_dataset_val = CLEVRDataset(folder_path=self.data_dir + 'val/', specific_attributes_flag=self.specific_attributes_flag, train_flag=False)
 		self.clevr_dataset_test = CLEVRDataset(folder_path=self.data_dir + 'test/', specific_attributes_flag=self.specific_attributes_flag, train_flag=False)
 

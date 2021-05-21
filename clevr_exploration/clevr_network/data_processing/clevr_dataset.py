@@ -16,7 +16,7 @@ import torchvision.transforms as transforms
 from clevr_data_utils import *
 
 class CLEVRDataset(Dataset):
-	def __init__(self, folder_path, specific_attributes_flag, train_flag):
+	def __init__(self, folder_path, specific_attributes_flag, train_flag, train_transforms=None):
 		self.image_path = f"{folder_path}images/"
 		self.data_len = len(glob.glob(self.image_path + "*"))
 
@@ -29,18 +29,8 @@ class CLEVRDataset(Dataset):
 		# If in training mode, use a different set of data augmentation.
 		self.train_flag = train_flag
 		if self.train_flag:
-			self.transform = transforms.Compose([
-				# transforms.ToPILImage(),
-				# transforms.RandomHorizontalFlip(p=0.5),
-				# transforms.RandomVerticalFlip(p=0.5),
-				# transforms.RandomRotation(degrees=30),
-				# transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-				transforms.ToTensor(),
-				transforms.Normalize(
-					mean=RGB_MEAN,
-					std=RGB_STD,
-				),
-			])
+			assert train_transforms is not None, "train_transforms shouldn't be empty."
+			self.transform = train_transforms
 		else:
 			self.transform = transforms.Compose([
 				transforms.ToTensor(),

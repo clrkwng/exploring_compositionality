@@ -50,11 +50,13 @@ class ResBlock(pl.LightningModule):
     return x
 
 class LightningCLEVRClassifier(pl.LightningModule):
-  def __init__(self, layers, image_channels, batch_size, train_size, val_size, test_size, lr, momentum):
+  def __init__(self, layers, image_channels, batch_size, num_epochs, train_size, val_size, test_size, optimizer, lr, momentum):
     super().__init__()
 
+    self.optimizer = optimizer
     self.lr = lr
     self.momentum = momentum
+    self.num_epochs = num_epochs
 
     # Grab the properties we want to output from the model.
     # It is up to the user to input the properties in order, as denoted in properties.json.
@@ -187,7 +189,14 @@ class LightningCLEVRClassifier(pl.LightningModule):
   
   def configure_optimizers(self):
     # Pass in self.parameters(), since the LightningModule IS the model.
-    optimizer = optim.SGD(self.parameters(), lr=self.lr, momentum=self.momentum)
+    if self.optimizer == "SGD":
+      optimizer = optim.SGD(self.parameters(), lr=self.lr, momentum=self.momentum)
+    elif self.optimizer == "Adam":
+      optimizer = optim.Adam(self.parameters(), lr=self.lr)
+    else:
+      print("An invalid optimizer was provided.")
+      sys.exit(-1)
+    # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=self.num_epochs)
     return optimizer
 
   # Loss function used for this model is BCEWithLogitsLoss().
