@@ -4,8 +4,8 @@ This model is used to handle compositionality tasks.
 """
 from comet_ml import Experiment
 
-import math, json
-import torch
+import math, json, torch
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -111,6 +111,13 @@ class LightningCLEVRClassifier(pl.LightningModule):
                                       nn.Linear(32, 8),\
                                       nn.ReLU(),\
                                       nn.Linear(8, 2))
+
+      # These hashmaps are used for calculating the "fair" metric accuracy.
+      self.material_train_count_map = {}
+      self.material_val_count_map = {}
+      self.material_test_count_map = {}
+      self.material_pct_map = {(1, 1): 46892/50000, (0, 1): 1453/50000, (1, 0): 1390/50000, (0, 0): 265/50000}
+
     if self.size_flag:
       self.size_train_correct, self.size_val_correct, self.size_test_correct = 0, 0, 0
       self.size_layers = nn.Sequential(nn.Linear(512, 256),\
@@ -120,6 +127,12 @@ class LightningCLEVRClassifier(pl.LightningModule):
                                       nn.Linear(32, 8),\
                                       nn.ReLU(),\
                                       nn.Linear(8, 2))
+
+      # These hashmaps are used for calculating the "fair" metric accuracy.
+      self.size_train_count_map = {}
+      self.size_val_count_map = {}
+      self.size_test_count_map = {}
+      self.size_pct_map = {(1, 1): 46690/50000, (1, 0): 1725/50000, (0, 1): 1320/50000, (0, 0): 265/50000}
 
     # These are used to get the accuracy on the concatenated label.
     # That is, the joint correctness of [shape, color, material, size].
@@ -197,6 +210,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
       print("An invalid optimizer was provided.")
       sys.exit(-1)
     # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=self.num_epochs)
+    # return [optimizer], [scheduler]
     return optimizer
 
   # Loss function used for this model is BCEWithLogitsLoss().
@@ -254,6 +268,58 @@ class LightningCLEVRClassifier(pl.LightningModule):
     # This summing will still keep the gradient fn.
     return sum(losses)
 
+  # This method will update the number of predictions that were correct.
+  # Used to calculate the "fair" metric accuracy.
+  def update_fair_count(self, preds, lbls, prop, run_flag):
+    np_lbls = tensor_to_numpy(lbls)
+    # Grab all the unique labels present in lbls.
+    unique_lbls = np.unique(np_lbls, axis=0)
+    for u_lbl in unique_lbls:
+      u_lbl_indices = [i for i, x in enumerate(np_lbls) if np.all(x == u_lbl)]
+      num_correct = vector_label_get_num_correct(preds[u_lbl_indices], lbls[u_lbl_indices])
+
+      # Now, update the appropriate map with the number of correct predictions.
+      map_key = tuple(u_lbl)
+      if run_flag == "train":
+        if prop == "material":
+          if map_key not in self.material_train_count_map:
+            self.material_train_count_map[map_key] = 0
+          self.material_train_count_map[map_key] += num_correct
+        elif prop == "size":
+          if map_key not in self.size_train_count_map:
+            self.size_train_count_map[map_key] = 0
+          self.size_train_count_map[map_key] += num_correct
+        else:
+          print("prop must be size or material.")
+          sys.exit(-1)
+      elif run_flag == "val":
+        if prop == "material":
+          if map_key not in self.material_val_count_map:
+            self.material_val_count_map[map_key] = 0
+          self.material_val_count_map[map_key] += num_correct
+        elif prop == "size":
+          if map_key not in self.size_val_count_map:
+            self.size_val_count_map[map_key] = 0
+          self.size_val_count_map[map_key] += num_correct
+        else:
+          print("prop must be size or material.")
+          sys.exit(-1)
+      elif run_flag == "test":
+        if prop == "material":
+          if map_key not in self.material_test_count_map:
+            self.material_test_count_map[map_key] = 0
+          self.material_test_count_map[map_key] += num_correct
+        elif prop == "size":
+          if map_key not in self.size_test_count_map:
+            self.size_test_count_map[map_key] = 0
+          self.size_test_count_map[map_key] += num_correct
+        else:
+          print("prop must be size or material.")
+          sys.exit(-1)
+      else:
+        print("run_flag must be train/val/test.")
+        sys.exit(-1)
+
   # Update train/val accuracies, based on train_flag's value.
   # NOTE: This method is to be called after using split_lbl_by_properties.
   def update_acc_by_properties(self, preds, labels, eval_mode):
@@ -262,40 +328,52 @@ class LightningCLEVRClassifier(pl.LightningModule):
     idx = 0
     if self.shape_flag:
       shape_correct = vector_label_get_num_correct(preds[idx], labels[idx])
-      idx += 1
       if eval_mode == "train": self.shape_train_correct += shape_correct
       elif eval_mode == "val": self.shape_val_correct += shape_correct
       elif eval_mode == "test": self.shape_test_correct += shape_correct
       else:
         print("Entered incorrect eval_mode.")
         sys.exit(-1)
+      idx += 1
     if self.color_flag:
       color_correct = vector_label_get_num_correct(preds[idx], labels[idx])
-      idx += 1
       if eval_mode == "train": self.color_train_correct += color_correct
       elif eval_mode == "val": self.color_val_correct += color_correct
       elif eval_mode == "test": self.color_test_correct += color_correct
       else:
         print("Entered incorrect eval_mode.")
         sys.exit(-1)
+      idx += 1
     if self.material_flag:
       material_correct = vector_label_get_num_correct(preds[idx], labels[idx])
-      idx += 1
-      if eval_mode == "train": self.material_train_correct += material_correct
-      elif eval_mode == "val": self.material_val_correct += material_correct
-      elif eval_mode == "test": self.material_test_correct += material_correct
+      if eval_mode == "train":
+        self.material_train_correct += material_correct
+        self.update_fair_count(preds=preds[idx], lbls=labels[idx], prop="material", run_flag="train")
+      elif eval_mode == "val":
+        self.material_val_correct += material_correct
+        self.update_fair_count(preds=preds[idx], lbls=labels[idx], prop="material", run_flag="val")
+      elif eval_mode == "test":
+        self.material_test_correct += material_correct
+        self.update_fair_count(preds=preds[idx], lbls=labels[idx], prop="material", run_flag="test")
       else:
         print("Entered incorrect eval_mode.")
         sys.exit(-1)
+      idx += 1
     if self.size_flag:
       size_correct = vector_label_get_num_correct(preds[idx], labels[idx])
-      idx += 1
-      if eval_mode == "train": self.size_train_correct += size_correct
-      elif eval_mode == "val": self.size_val_correct += size_correct
-      elif eval_mode == "test": self.size_test_correct += size_correct
+      if eval_mode == "train":
+        self.size_train_correct += size_correct
+        self.update_fair_count(preds=preds[idx], lbls=labels[idx], prop="size", run_flag="train")
+      elif eval_mode == "val":
+        self.size_val_correct += size_correct
+        self.update_fair_count(preds=preds[idx], lbls=labels[idx], prop="size", run_flag="val")
+      elif eval_mode == "test":
+        self.size_test_correct += size_correct
+        self.update_fair_count(preds=preds[idx], lbls=labels[idx], prop="size", run_flag="test")
       else:
         print("Entered incorrect eval_mode.")
         sys.exit(-1)
+      idx += 1
 
     assert idx == len(labels), "Not all the properties were accounted for."
 
@@ -326,18 +404,35 @@ class LightningCLEVRClassifier(pl.LightningModule):
         shape_train_acc = round(self.shape_train_correct/self.train_size, 6)
         self.logger.experiment.log_metric("shape_train_acc", shape_train_acc, step=self.step)
         self.shape_train_correct = 0
+
       if self.color_flag:
         color_train_acc = round(self.color_train_correct/self.train_size, 6)
         self.logger.experiment.log_metric("color_train_acc", color_train_acc, step=self.step)
         self.color_train_correct = 0
+
       if self.material_flag:
         material_train_acc = round(self.material_train_correct/self.train_size, 6)
         self.logger.experiment.log_metric("material_train_acc", material_train_acc, step=self.step)
         self.material_train_correct = 0
+
+        material_train_fair_acc = 0
+        for lbl, count in self.material_train_count_map.items():
+          material_train_fair_acc += count / (self.material_pct_map[lbl] * self.train_size)
+        material_train_fair_acc *= 0.25
+        self.material_train_count_map = {}
+        self.logger.experiment.log_metric("material_train_fair_acc", material_train_fair_acc, step=self.step)
+
       if self.size_flag:
         size_train_acc = round(self.size_train_correct/self.train_size, 6)
         self.logger.experiment.log_metric("size_train_acc", size_train_acc, step=self.step)
         self.size_train_correct = 0
+
+        size_train_fair_acc = 0
+        for lbl, count in self.size_train_count_map.items():
+          size_train_fair_acc += count / (self.size_pct_map[lbl] * self.train_size)
+        size_train_fair_acc *= 0.25
+        self.size_train_count_map = {}
+        self.logger.experiment.log_metric("size_train_fair_acc", size_train_fair_acc, step=self.step)
 
       concat_label_train_acc = round(self.concat_label_train_correct/self.train_size, 6)
       self.logger.experiment.log_metric("concat_label_train_acc", concat_label_train_acc, step=self.step)
@@ -374,25 +469,42 @@ class LightningCLEVRClassifier(pl.LightningModule):
           shape_val_acc = round(self.shape_val_correct/self.val_size, 6)
           self.logger.experiment.log_metric("shape_acc", shape_val_acc, step=self.step)
           self.shape_val_correct = 0
+
         if self.color_flag:
           color_val_acc = round(self.color_val_correct/self.val_size, 6)
           self.logger.experiment.log_metric("color_acc", color_val_acc, step=self.step)
           self.color_val_correct = 0
+
         if self.material_flag:
           material_val_acc = round(self.material_val_correct/self.val_size, 6)
           self.logger.experiment.log_metric("material_acc", material_val_acc, step=self.step)
           self.material_val_correct = 0
+
+          material_val_fair_acc = 0
+          for lbl, count in self.material_val_count_map.items():
+            material_val_fair_acc += count / (self.material_pct_map[lbl] * self.val_size)
+          material_val_fair_acc *= 0.25
+          self.material_val_count_map = {}
+          self.logger.experiment.log_metric("material_val_fair_acc", material_val_fair_acc, step=self.step)
+
         if self.size_flag:
           size_val_acc = round(self.size_val_correct/self.val_size, 6)
           self.logger.experiment.log_metric("size_acc", size_val_acc, step=self.step)
           self.size_val_correct = 0
+
+          size_val_fair_acc = 0
+          for lbl, count in self.size_val_count_map.items():
+            size_val_fair_acc += count / (self.size_pct_map[lbl] * self.val_size)
+          size_val_fair_acc *= 0.25
+          self.size_val_count_map = {}
+          self.logger.experiment.log_metric("size_val_fair_acc", size_val_fair_acc, step=self.step)
 
         concat_label_val_acc = round(self.concat_label_val_correct/self.val_size, 6)
         self.logger.experiment.log_metric("concat_label_acc", concat_label_val_acc, step=self.step)
         self.concat_label_val_correct = 0
 
   def test_step(self, test_batch, batch_idx):
-    with self.logger.experiment.validate():
+    with self.logger.experiment.test():
       inputs, concat_labels = test_batch
       labels = self.split_lbl_by_properties(concat_labels)
 
@@ -411,18 +523,35 @@ class LightningCLEVRClassifier(pl.LightningModule):
           shape_test_acc = round(self.shape_test_correct/self.test_size, 6)
           self.logger.experiment.log_metric("test_shape_acc", shape_test_acc, step=self.step)
           self.shape_test_correct = 0
+
         if self.color_flag:
           color_test_acc = round(self.color_test_correct/self.test_size, 6)
           self.logger.experiment.log_metric("test_color_acc", color_test_acc, step=self.step)
           self.color_test_correct = 0
+
         if self.material_flag:
           material_test_acc = round(self.material_test_correct/self.test_size, 6)
           self.logger.experiment.log_metric("test_material_acc", material_test_acc, step=self.step)
           self.material_test_correct = 0
+
+          material_test_fair_acc = 0
+          for lbl, count in self.material_test_count_map.items():
+            material_test_fair_acc += count / (self.material_pct_map[lbl] * self.test_size)
+          material_test_fair_acc *= 0.25
+          self.material_test_count_map = {}
+          self.logger.experiment.log_metric("material_test_fair_acc", material_test_fair_acc, step=self.step)
+
         if self.size_flag:
           size_test_acc = round(self.size_test_correct/self.test_size, 6)
           self.logger.experiment.log_metric("test_size_acc", size_test_acc, step=self.step)
           self.size_test_correct = 0
+
+          size_test_fair_acc = 0
+          for lbl, count in self.size_test_count_map.items():
+            size_test_fair_acc += count / (self.size_pct_map[lbl] * self.test_size)
+          size_test_fair_acc *= 0.25
+          self.size_test_count_map = {}
+          self.logger.experiment.log_metric("size_test_fair_acc", size_test_fair_acc, step=self.step)
 
         concat_label_test_acc = round(self.concat_label_test_correct/self.test_size, 6)
         self.logger.experiment.log_metric("test_concat_label_acc", concat_label_test_acc, step=self.step)

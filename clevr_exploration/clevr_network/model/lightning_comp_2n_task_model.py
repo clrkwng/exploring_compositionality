@@ -52,8 +52,14 @@ class ResBlock(pl.LightningModule):
     return x
 
 class LightningCLEVRClassifier(pl.LightningModule):
-  def __init__(self, layers, image_channels, batch_size, train_size, val_size, test_size, output_size):
+  def __init__(self, layers, image_channels, batch_size, num_epochs, train_size, val_size, test_size, optimizer, lr, momentum):
     super().__init__()
+
+    self.optimizer = optimizer
+    self.lr = lr
+    self.momentum = momentum
+    self.num_epochs = num_epochs
+
     self.in_channels = 64
     self.conv1 = nn.Conv2d(image_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
     self.bn1 = nn.BatchNorm2d(64)
@@ -70,7 +76,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
 
     self.output_layers = nn.Sequential(nn.Linear(512, 256),\
                                        nn.ReLU(),\
-                                       nn.Linear(256, output_size))
+                                       nn.Linear(256, 96)) # This 96 is hard-coded (3 * 8 * 2 * 2).
 
     self.batch_size = batch_size
     self.train_size, self.val_size, self.test_size = train_size, val_size, test_size
@@ -83,7 +89,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
     self.save_model_path = 'data/clevr_model_state_dict.pt'
     self.step = 0
 
-    self.train_correct, self.val_correct = 0, 0
+    self.train_correct, self.val_correct, self.test_correct = 0, 0, 0
 
   def _make_layer(self, num_residual_blocks, intermediate_channels, stride):
     identity_downsample = None
@@ -127,7 +133,15 @@ class LightningCLEVRClassifier(pl.LightningModule):
   
   def configure_optimizers(self):
     # Pass in self.parameters(), since the LightningModule IS the model.
-    optimizer = optim.SGD(self.parameters(), lr=LR, momentum=MOMENTUM)
+    if self.optimizer == "SGD":
+      optimizer = optim.SGD(self.parameters(), lr=self.lr, momentum=self.momentum)
+    elif self.optimizer == "Adam":
+      optimizer = optim.Adam(self.parameters(), lr=self.lr)
+    else:
+      print("An invalid optimizer was provided.")
+      sys.exit(-1)
+    # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=self.num_epochs)
+    # return [optimizer], [scheduler]
     return optimizer
 
   def bc_entropy_loss(self, logits, labels):
@@ -177,6 +191,23 @@ class LightningCLEVRClassifier(pl.LightningModule):
 
         # Reset the number of validation correct.
         self.val_correct = 0
+
+  def test_step(self, test_batch, batch_idx):
+    with self.logger.experiment.test():
+      inputs, labels = test_batch
+      preds = self.forward(inputs)
+      loss = self.bc_entropy_loss(preds, labels)
+
+      self.test_correct += vector_label_get_num_correct(preds, labels)
+
+      if batch_idx == self.num_test_batches - 1:
+        print(f"Logging Test Accuracy at test_batch {batch_idx}")
+        test_acc = round(self.test_correct/self.test_size, 6)
+        self.logger.experiment.log_metric("test_acc", test_acc, step=self.step)
+
+        # Reset the number of test correct.
+        self.test_correct = 0
+
 
 
 # Testing code below.

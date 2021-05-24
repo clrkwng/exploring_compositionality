@@ -13,7 +13,7 @@ from clevr_dataloader import *
 from clevr_data_utils import *
 sys.path.pop(0)
 sys.path.insert(0, 'model/')
-from lightning_comp_2_task_model import *
+from lightning_comp_2n_task_model import *
 sys.path.pop(0)
 
 def main():
@@ -44,14 +44,14 @@ def main():
 						transforms.RandomHorizontalFlip(p=0.5), 
 						transforms.RandomVerticalFlip(p=0.5), 
 						transforms.RandomRotation(degrees=30),
-						transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+						# transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
 						transforms.ToTensor(),
 						transforms.Normalize(
 							mean=RGB_MEAN,
 							std=RGB_STD,
 						),
 					])
-	specific_attributes_flag = False
+	specific_attributes_flag = True
 	data_module = CLEVRDataModule('../clevr-dataset-gen/output/', BATCH_SIZE, specific_attributes_flag, TRAIN_TRANSFORMS)
 	model = LightningCLEVRClassifier(layers=[1, 1, 1, 1], 
 																	 image_channels=3, 
