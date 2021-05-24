@@ -13,7 +13,7 @@ from clevr_dataloader import *
 from clevr_data_utils import *
 sys.path.pop(0)
 sys.path.insert(0, 'model/')
-from lightning_comp_2n_task_model import *
+from lightning_comp_task_model import *
 sys.path.pop(0)
 
 def main():
@@ -34,7 +34,7 @@ def main():
 	BATCH_SIZE = 256
 	LR = 1e-1
 	MOMENTUM = 0.9
-	NUM_EPOCHS = 200
+	NUM_EPOCHS = 100
 	OPTIMIZER = "SGD" # Pass in SGD or Adam.
 
 	RGB_MEAN = load_pickle("data/rgb_mean.pickle")
@@ -44,15 +44,15 @@ def main():
 						transforms.RandomHorizontalFlip(p=0.5), 
 						transforms.RandomVerticalFlip(p=0.5), 
 						transforms.RandomRotation(degrees=30),
-						# transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
+						transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
 						transforms.ToTensor(),
 						transforms.Normalize(
 							mean=RGB_MEAN,
 							std=RGB_STD,
 						),
 					])
-	specific_attributes_flag = True
-	data_module = CLEVRDataModule('../clevr-dataset-gen/output/', BATCH_SIZE, specific_attributes_flag, TRAIN_TRANSFORMS)
+	join_labels_flag = True
+	data_module = CLEVRDataModule('../clevr-dataset-gen/output/', BATCH_SIZE, join_labels_flag, TRAIN_TRANSFORMS)
 	model = LightningCLEVRClassifier(layers=[1, 1, 1, 1], 
 																	 image_channels=3, 
 																	 batch_size=BATCH_SIZE,
@@ -62,7 +62,8 @@ def main():
 																	 test_size=test_size,
 																	 optimizer=OPTIMIZER,
 																	 lr=LR,
-																	 momentum=MOMENTUM)
+																	 momentum=MOMENTUM,
+																	 join_labels_flag=join_labels_flag)
 	trainer = pl.Trainer(
 		gpus=1,
 		profiler="simple",

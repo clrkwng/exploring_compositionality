@@ -16,7 +16,7 @@ import torchvision.transforms as transforms
 from clevr_data_utils import *
 
 class CLEVRDataset(Dataset):
-	def __init__(self, folder_path, specific_attributes_flag, train_flag, train_transforms=None):
+	def __init__(self, folder_path, join_labels_flag, train_flag, train_transforms=None):
 		self.image_path = f"{folder_path}images/"
 		self.data_len = len(glob.glob(self.image_path + "*"))
 
@@ -42,7 +42,7 @@ class CLEVRDataset(Dataset):
 
 		# This flag denotes whether to use 2, or 2n embedding setup for the label.
 		# If True, will be using 2n embedding, else using 2 embedding.
-		self.specific_attributes_flag = specific_attributes_flag
+		self.join_labels_flag = join_labels_flag
 
 	def __len__(self):
 		# Note: can hardcode the length that is returned here, to restrict which data is returned.
@@ -62,7 +62,7 @@ class CLEVRDataset(Dataset):
 		if self.train_flag and scene_has_disallowed_combo(label_path):
 			return None
 
-		label = get_image_labels(label_path, self.specific_attributes_flag)
+		label = get_image_labels(label_path, self.join_labels_flag)
 
 		single_image_path = self.image_path + f"CLEVR_new_{str(index).zfill(6)}.png"
 		im = Image.open(single_image_path).convert('RGB') # Convert RGBA -> RGB.

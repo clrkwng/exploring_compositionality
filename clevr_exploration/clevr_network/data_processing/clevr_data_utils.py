@@ -32,7 +32,7 @@ def parse_num_objects_from_json(json_path):
 
 # Return a hashmap of the objects in json_path, where elements are tuple in order of task_properties.
 # The key is the tuple, and the value is the count.
-def parse_obj_properties_from_json(json_path, task_properties, specific_attributes_flag):
+def parse_obj_properties_from_json(json_path, task_properties, join_labels_flag):
   # Using a hashmap will allow for duplicate objects, in lieu of a set.
   obj_map = {}
   with open(json_path, 'r') as f:
@@ -40,7 +40,7 @@ def parse_obj_properties_from_json(json_path, task_properties, specific_attribut
 
   for o in data["objects"]:
     # For the 2|B| embedding case.
-    if specific_attributes_flag:
+    if join_labels_flag:
       # Get the key, which is a tuple of the attributes.
       tuple_props = []
       for prop in task_properties:
@@ -63,7 +63,7 @@ def parse_obj_properties_from_json(json_path, task_properties, specific_attribut
   return obj_map
 
 # Get the labels, based on what is in task_properties.json. 
-def get_image_labels(json_path, specific_attributes_flag):
+def get_image_labels(json_path, join_labels_flag):
   label_format_lst = []
 
   # Opening task_properties.json and properties.json files.
@@ -74,7 +74,7 @@ def get_image_labels(json_path, specific_attributes_flag):
     properties = json.load(f)
 
   attribute_lst = [[k for k, _ in properties[prop].items()] for prop in task_properties]
-  if specific_attributes_flag:
+  if join_labels_flag:
     # Generate the list of label formats. This one supports the "2|B|" embedding label.
     label_format_lst = list(itertools.product(*attribute_lst))
   else:
@@ -82,7 +82,7 @@ def get_image_labels(json_path, specific_attributes_flag):
     label_format_lst = [attribute for prop_list in attribute_lst for attribute in prop_list]
   
   label_vec = [0] * len(label_format_lst)
-  obj_map = parse_obj_properties_from_json(json_path, task_properties, specific_attributes_flag)
+  obj_map = parse_obj_properties_from_json(json_path, task_properties, join_labels_flag)
   # For now, label_vec is just a boolean vector (denoting presence of a certain tuple or not).
   # TODO: When looking at presence of N > 1 objects, change the label_vec value to be val of obj_map.
   for i in range(len(label_format_lst)):
