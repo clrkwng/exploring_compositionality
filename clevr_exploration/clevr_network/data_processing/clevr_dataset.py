@@ -62,11 +62,11 @@ class CLEVRDataset(Dataset):
 		if self.train_flag and scene_has_disallowed_combo(label_path):
 			return None
 
-		label = get_image_labels(label_path, self.join_labels_flag)
-
 		single_image_path = self.image_path + f"CLEVR_new_{str(index).zfill(6)}.png"
 		im = Image.open(single_image_path).convert('RGB') # Convert RGBA -> RGB.
 		im = np.asarray(im).copy() # This makes it available to be modified.
 		im = self.transform(im)
+
+		label = get_image_labels(label_path, self.join_labels_flag)
 
 		return (im, label)

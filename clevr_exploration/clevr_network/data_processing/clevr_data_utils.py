@@ -62,7 +62,7 @@ def parse_obj_properties_from_json(json_path, task_properties, join_labels_flag)
 
   return obj_map
 
-# Get the labels, based on what is in task_properties.json. 
+# Get the labels, based on what is in task_properties.json.
 def get_image_labels(json_path, join_labels_flag):
   label_format_lst = []
 
@@ -95,7 +95,7 @@ def scene_has_disallowed_combo(json_path):
   # Initialize DISALLOWED_LIST if it is empty.
   global DISALLOWED_LIST
   if len(DISALLOWED_LIST) == 0:
-    with open('../clevr-dataset-gen/image_generation/data/disallowed_combos.json', 'r') as f:
+    with open('../clevr-dataset-gen/image_generation/data/training_disallowed_combos.json', 'r') as f:
       combos = json.load(f)
     DISALLOWED_LIST = [set(c) for c in combos]
 

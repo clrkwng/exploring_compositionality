@@ -51,7 +51,8 @@ def main():
 							std=RGB_STD,
 						),
 					])
-	join_labels_flag = True
+					
+	join_labels_flag = False
 	data_module = CLEVRDataModule('../clevr-dataset-gen/output/', BATCH_SIZE, join_labels_flag, TRAIN_TRANSFORMS)
 	model = LightningCLEVRClassifier(layers=[1, 1, 1, 1], 
 																	 image_channels=3, 
