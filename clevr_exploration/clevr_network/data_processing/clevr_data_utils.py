@@ -77,7 +77,7 @@ def get_concat_join_labels(json_path):
 
   attribute_lst = [[k for k, _ in properties[prop].items()] for prop in task_properties]
 
-	# Generate list of label formats. This label is for the concat label.
+  # Generate list of label formats. This label is for the concat label.
   concat_label_format_lst = [attribute for prop_list in attribute_lst for attribute in prop_list]
   concat_label_vec = [0] * len(concat_label_format_lst)
   obj_map = parse_obj_properties_from_json(json_path, task_properties, False)
@@ -87,7 +87,7 @@ def get_concat_join_labels(json_path):
     if concat_label_format_lst[i] in obj_map:
       concat_label_vec[i] = 1
 
-	# Generate the list of label formats. This label is for the join label.
+  # Generate the list of label formats. This label is for the join label.
   join_label_format_lst = list(itertools.product(*attribute_lst))
 
   join_label_vec = [0] * len(join_label_format_lst)
@@ -100,14 +100,18 @@ def get_concat_join_labels(json_path):
 
   return (np.array(concat_label_vec), np.array(join_label_vec))
 
+# Process and return the disallowed combos list.
+def get_disallowed_combos_lst(train_disallowed_combos_json):
+  with open(train_disallowed_combos_json, 'r') as f:
+    combos = json.load(f)
+  return [set(c) for c in combos]
+
 # Returns True if the scene contains a disallowed combo, else False.
 def scene_has_disallowed_combo(json_path, train_disallowed_combos_json):
   # Initialize DISALLOWED_LIST if it is empty.
   global DISALLOWED_LIST
   if train_disallowed_combos_json and len(DISALLOWED_LIST) == 0:
-    with open(train_disallowed_combos_json, 'r') as f:
-      combos = json.load(f)
-    DISALLOWED_LIST = [set(c) for c in combos]
+    DISALLOWED_LIST = get_disallowed_combos_lst(train_disallowed_combos_json)
     print(f"Disallowed train list: {DISALLOWED_LIST}")
 
   # Data is the map contained in json_path.

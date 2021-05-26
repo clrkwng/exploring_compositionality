@@ -51,13 +51,14 @@ class ResBlock(pl.LightningModule):
     return x
 
 class LightningCLEVRClassifier(pl.LightningModule):
-  def __init__(self, resnet18_flag, layers, image_channels, batch_size, num_epochs, train_size, val_size, test_size, optimizer, lr, momentum):
+  def __init__(self, resnet18_flag, layers, image_channels, batch_size, num_epochs, train_size, val_size, test_size, optimizer, lr, momentum, scheduler):
     super().__init__()
 
     self.optimizer = optimizer
     self.lr = lr
     self.momentum = momentum
     self.num_epochs = num_epochs
+    self.scheduler = scheduler
 
     # Grab the properties we want to output from the model.
     # It is up to the user to input the properties in order, as denoted in properties.json.
@@ -72,9 +73,11 @@ class LightningCLEVRClassifier(pl.LightningModule):
     self.resnet18_flag = resnet18_flag
 
     if resnet18_flag:
+      print(f"Using ResNet18.")
       self.resnet18 = models.resnet18()
       self.resnet18_lin_layer = nn.Linear(1000, 512)
     else:
+      print(f"Using MiniResNet18.")
       self.in_channels = 64
       self.conv1 = nn.Conv2d(image_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
       self.bn1 = nn.BatchNorm2d(64)
@@ -211,9 +214,17 @@ class LightningCLEVRClassifier(pl.LightningModule):
     else:
       print("Optimizer must be either SGD or Adam.")
       sys.exit(-1)
-    # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=self.num_epochs)
-    # return [optimizer], [scheduler]
-    return optimizer
+
+    if self.scheduler == None:
+      return optimizer
+    elif self.scheduler == "StepLR":
+      scheduler = optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=5, gamma=0.9)
+    elif self.scheduler == "CosineAnnealingLR":
+      scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=self.num_epochs)
+    else:
+      print("Scheduler must be StepLR/CosineAnnealingLR/None.")
+      sys.exit(-1)
+    return [optimizer], [scheduler]
 
   # Loss function used for this model is BCEWithLogitsLoss().
   def bc_entropy_loss(self, logits, labels):

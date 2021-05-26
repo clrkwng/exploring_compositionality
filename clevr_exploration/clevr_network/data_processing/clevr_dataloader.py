@@ -12,18 +12,19 @@ from clevr_dataset import *
 # DataModule makes data reusable and easy to share.
 class CLEVRDataModule(pl.LightningDataModule):
 	# ALl the code in Lightning makes sure that this method is called from ONLY one GPU.
-	def __init__(self, data_dir, batch_size, train_transforms, train_disallowed_combos_json):
+	def __init__(self, data_dir, em_number, batch_size, train_transforms, train_disallowed_combos_json):
 		super().__init__()
 		self.data_dir = data_dir
+		self.em_number = em_number
 		self.batch_size = batch_size
 		self.train_transforms = train_transforms
 		self.train_disallowed_combos_json = train_disallowed_combos_json
 
 	def setup(self, stage):
 		# We use the data augmentations for the training data, but val / test do not use them.
-		self.clevr_dataset_train = CLEVRDataset(folder_path=self.data_dir + 'train/', train_flag=True, train_disallowed_combos_json=self.train_disallowed_combos_json, train_transforms=self.train_transforms)
-		self.clevr_dataset_val = CLEVRDataset(folder_path=self.data_dir + 'val/', train_flag=False)
-		self.clevr_dataset_test = CLEVRDataset(folder_path=self.data_dir + 'test/', train_flag=False)
+		self.clevr_dataset_train = CLEVRDataset(folder_path=self.data_dir + f'train{self.em_number}/', train_flag=True, train_disallowed_combos_json=self.train_disallowed_combos_json, train_transforms=self.train_transforms)
+		self.clevr_dataset_val = CLEVRDataset(folder_path=self.data_dir + f'val{self.em_number}/', train_flag=False)
+		self.clevr_dataset_test = CLEVRDataset(folder_path=self.data_dir + f'test{self.em_number}/', train_flag=False)
 
 	# These are responsible for returning the appropriate data split.
 	def train_dataloader(self):
