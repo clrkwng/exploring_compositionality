@@ -16,7 +16,7 @@ import torchvision.transforms as transforms
 from clevr_data_utils import *
 
 class CLEVRDataset(Dataset):
-	def __init__(self, folder_path, join_labels_flag, train_flag, train_transforms=None):
+	def __init__(self, folder_path, train_flag, train_disallowed_combos_json=None, train_transforms=None):
 		self.image_path = f"{folder_path}images/"
 		self.data_len = len(glob.glob(self.image_path + "*"))
 
@@ -40,9 +40,7 @@ class CLEVRDataset(Dataset):
 				),
 			])
 
-		# This flag denotes whether to use 2, or 2n embedding setup for the label.
-		# If True, will be using 2n embedding, else using 2 embedding.
-		self.join_labels_flag = join_labels_flag
+		self.train_disallowed_combos_json = train_disallowed_combos_json
 
 	def __len__(self):
 		# Note: can hardcode the length that is returned here, to restrict which data is returned.
@@ -59,7 +57,7 @@ class CLEVRDataset(Dataset):
 		# If the image contains a disallowed combo, then we reject it.
 		# This will be cleaned up in the collate_fn, defined in clevr_dataloader.py.
 		# Only do this for train dataset.
-		if self.train_flag and scene_has_disallowed_combo(label_path):
+		if self.train_flag and scene_has_disallowed_combo(label_path, self.train_disallowed_combos_json):
 			return None
 
 		single_image_path = self.image_path + f"CLEVR_new_{str(index).zfill(6)}.png"
@@ -67,6 +65,5 @@ class CLEVRDataset(Dataset):
 		im = np.asarray(im).copy() # This makes it available to be modified.
 		im = self.transform(im)
 
-		label = get_image_labels(label_path, self.join_labels_flag)
-
-		return (im, label)
+		concat_label, join_label = get_concat_join_labels(label_path)
+		return (im, concat_label, join_label)

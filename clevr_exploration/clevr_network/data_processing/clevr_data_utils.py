@@ -63,8 +63,10 @@ def parse_obj_properties_from_json(json_path, task_properties, join_labels_flag)
   return obj_map
 
 # Get the labels, based on what is in task_properties.json.
-def get_image_labels(json_path, join_labels_flag):
-  label_format_lst = []
+# This will return (concat_label, join_label).
+def get_concat_join_labels(json_path):
+  join_label_format_lst = []
+  concat_label_format_lst = []
 
   # Opening task_properties.json and properties.json files.
   # Change this pathing, depending on if testing in Jupyter Notebook or not.
@@ -74,30 +76,39 @@ def get_image_labels(json_path, join_labels_flag):
     properties = json.load(f)
 
   attribute_lst = [[k for k, _ in properties[prop].items()] for prop in task_properties]
-  if join_labels_flag:
-    # Generate the list of label formats. This one supports the "2|B|" embedding label.
-    label_format_lst = list(itertools.product(*attribute_lst))
-  else:
-    # Generate list of label formats. This one supports the "|B|" embedding label.
-    label_format_lst = [attribute for prop_list in attribute_lst for attribute in prop_list]
-  
-  label_vec = [0] * len(label_format_lst)
-  obj_map = parse_obj_properties_from_json(json_path, task_properties, join_labels_flag)
+
+	# Generate list of label formats. This label is for the concat label.
+  concat_label_format_lst = [attribute for prop_list in attribute_lst for attribute in prop_list]
+  concat_label_vec = [0] * len(concat_label_format_lst)
+  obj_map = parse_obj_properties_from_json(json_path, task_properties, False)
   # For now, label_vec is just a boolean vector (denoting presence of a certain tuple or not).
   # TODO: When looking at presence of N > 1 objects, change the label_vec value to be val of obj_map.
-  for i in range(len(label_format_lst)):
-    if label_format_lst[i] in obj_map:
-      label_vec[i] = 1
-  return np.array(label_vec)
+  for i in range(len(concat_label_format_lst)):
+    if concat_label_format_lst[i] in obj_map:
+      concat_label_vec[i] = 1
+
+	# Generate the list of label formats. This label is for the join label.
+  join_label_format_lst = list(itertools.product(*attribute_lst))
+
+  join_label_vec = [0] * len(join_label_format_lst)
+  obj_map = parse_obj_properties_from_json(json_path, task_properties, True)
+  # For now, label_vec is just a boolean vector (denoting presence of a certain tuple or not).
+  # TODO: When looking at presence of N > 1 objects, change the label_vec value to be val of obj_map.
+  for i in range(len(join_label_format_lst)):
+    if join_label_format_lst[i] in obj_map:
+      join_label_vec[i] = 1
+
+  return (np.array(concat_label_vec), np.array(join_label_vec))
 
 # Returns True if the scene contains a disallowed combo, else False.
-def scene_has_disallowed_combo(json_path):
+def scene_has_disallowed_combo(json_path, train_disallowed_combos_json):
   # Initialize DISALLOWED_LIST if it is empty.
   global DISALLOWED_LIST
-  if len(DISALLOWED_LIST) == 0:
-    with open('../clevr-dataset-gen/image_generation/data/training_disallowed_combos.json', 'r') as f:
+  if train_disallowed_combos_json and len(DISALLOWED_LIST) == 0:
+    with open(train_disallowed_combos_json, 'r') as f:
       combos = json.load(f)
     DISALLOWED_LIST = [set(c) for c in combos]
+    print(f"Disallowed train list: {DISALLOWED_LIST}")
 
   # Data is the map contained in json_path.
   with open(json_path, 'r') as f:
