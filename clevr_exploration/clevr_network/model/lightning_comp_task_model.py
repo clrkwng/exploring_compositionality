@@ -73,11 +73,11 @@ class LightningCLEVRClassifier(pl.LightningModule):
     self.resnet18_flag = resnet18_flag
 
     if resnet18_flag:
-      print(f"Using ResNet18.")
+      print(f"Using ResNet18.\n")
       self.resnet18 = models.resnet18()
       self.resnet18_lin_layer = nn.Linear(1000, 512)
     else:
-      print(f"Using MiniResNet18.")
+      print(f"Using MiniResNet18.\n")
       self.in_channels = 64
       self.conv1 = nn.Conv2d(image_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
       self.bn1 = nn.BatchNorm2d(64)
@@ -91,16 +91,12 @@ class LightningCLEVRClassifier(pl.LightningModule):
       self.layer4 = self._make_layer(layers[3], intermediate_channels=512, stride=2)
 
       self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-
-    # This value is accumulated over the different properties that are present.
-    join_output_size = 1
     
     # These MLPs are used for shape, color, material, size guesses.
     # The output sizes of these layers are based on num_attributes for each property.
     # TODO: Need to change this hard-coding if we decide to use continuous properties.
     # Also, initialize the num_correct parameters for each property.
     if self.shape_flag:
-      join_output_size *= 3
       self.shape_train_correct, self.shape_val_correct, self.shape_test_correct = 0, 0, 0
       self.shape_layers = nn.Sequential(nn.Linear(512, 256),\
                                       nn.ReLU(),\
@@ -110,7 +106,6 @@ class LightningCLEVRClassifier(pl.LightningModule):
                                       nn.ReLU(),\
                                       nn.Linear(8, 3))
     if self.color_flag:
-      join_output_size *= 8
       self.color_train_correct, self.color_val_correct, self.color_test_correct = 0, 0, 0
       self.color_layers = nn.Sequential(nn.Linear(512, 256),\
                                       nn.ReLU(),\
@@ -118,7 +113,6 @@ class LightningCLEVRClassifier(pl.LightningModule):
                                       nn.ReLU(),\
                                       nn.Linear(32, 8))
     if self.material_flag:
-      join_output_size *= 2
       self.material_train_correct, self.material_val_correct, self.material_test_correct = 0, 0, 0
       self.material_layers = nn.Sequential(nn.Linear(512, 256),\
                                       nn.ReLU(),\
@@ -140,7 +134,6 @@ class LightningCLEVRClassifier(pl.LightningModule):
       self.material_test_count_map = {}
 
     if self.size_flag:
-      join_output_size *= 2
       self.size_train_correct, self.size_val_correct, self.size_test_correct = 0, 0, 0
       self.size_layers = nn.Sequential(nn.Linear(512, 256),\
                                       nn.ReLU(),\
@@ -160,14 +153,8 @@ class LightningCLEVRClassifier(pl.LightningModule):
       self.size_test_count_map = {}
 
     # These are used to get the accuracy on the concatenated label.
-    # That is, the joint correctness of [shape, color, material, size].
+    # That is, the concatenated correctness of [shape, color, material, size].
     self.concat_label_train_correct, self.concat_label_val_correct, self.concat_label_test_correct = 0, 0, 0
-
-    self.join_output_layers = nn.Sequential(nn.Linear(512, 256),\
-                                        nn.ReLU(),\
-                                        nn.Linear(256, join_output_size)) # This 96 is hard-coded (3 * 8 * 2 * 2).
-
-    self.join_train_correct, self.join_val_correct, self.join_test_correct = 0, 0, 0
 
     self.batch_size = batch_size
     self.train_size, self.val_size, self.test_size = train_size, val_size, test_size
@@ -438,21 +425,15 @@ class LightningCLEVRClassifier(pl.LightningModule):
     if self.size_flag:
       pred_lst.append(self.size_layers(x))
 
-    return pred_lst, self.join_output_layers(x)
+    return pred_lst
 
   def training_step(self, train_batch, batch_idx):
-    inputs, concat_labels, join_labels = train_batch
-    concat_preds, join_preds = self.forward(inputs)
-
-    join_loss = self.bc_entropy_loss(join_preds, join_labels)
-    # Update the number of train join labels correct.
-    self.join_train_correct += vector_label_get_num_correct(join_preds, join_labels)
+    inputs, concat_labels = train_batch
+    concat_preds = self.forward(inputs)
 
     marginal_labels = self.split_lbl_by_properties(concat_labels)    
     # Call this loss helper method on the split labels and preds.
-    concat_loss = self.get_loss_by_properties(preds=concat_preds, labels=marginal_labels)
-
-    loss = join_loss + concat_loss
+    loss = self.get_loss_by_properties(preds=concat_preds, labels=marginal_labels)
   
     # Update the number of training correct.
     self.update_acc_by_properties(preds=concat_preds, labels=marginal_labels, eval_mode="train")
@@ -465,11 +446,6 @@ class LightningCLEVRClassifier(pl.LightningModule):
     # If we reach the end of one epoch, log accuracies and zero out the number of correct.
     if batch_idx == self.num_train_batches - 1:
       print(f"Logging Training Accuracy at train_batch {batch_idx}")
-
-      # Log and reset the number of training correct.
-      train_acc = round(self.join_train_correct/self.train_size, 6)
-      self.logger.experiment.log_metric("join_train_acc", train_acc, step=self.step)
-      self.join_train_correct = 0
 
       if self.shape_flag:
         shape_train_acc = round(self.shape_train_correct/self.train_size, 6)
@@ -523,18 +499,12 @@ class LightningCLEVRClassifier(pl.LightningModule):
 
   def validation_step(self, val_batch, batch_idx):
     with self.logger.experiment.validate():
-      inputs, concat_labels, join_labels = val_batch
-      concat_preds, join_preds = self.forward(inputs)
-
-      join_loss = self.bc_entropy_loss(join_preds, join_labels)
-      # Update the number of val join labels correct.
-      self.join_val_correct += vector_label_get_num_correct(join_preds, join_labels)
+      inputs, concat_labels = val_batch
+      concat_preds = self.forward(inputs)
 
       marginal_labels = self.split_lbl_by_properties(concat_labels)
       # Call this loss helper method on the split labels and preds.
-      concat_loss = self.get_loss_by_properties(preds=concat_preds, labels=marginal_labels)
-
-      loss = join_loss + concat_loss
+      loss = self.get_loss_by_properties(preds=concat_preds, labels=marginal_labels)
 
       # Update the number of validation correct.
       self.update_acc_by_properties(preds=concat_preds, labels=marginal_labels, eval_mode="val")
@@ -547,11 +517,6 @@ class LightningCLEVRClassifier(pl.LightningModule):
 
       if batch_idx == self.num_val_batches - 1:
         print(f"Logging Validation Accuracy at val_batch {batch_idx}")
-
-        # Log and reset the number of validation correct.
-        val_acc = round(self.join_val_correct/self.val_size, 6)
-        self.logger.experiment.log_metric("join_acc", val_acc, step=self.step)
-        self.join_val_correct = 0
         
         if self.shape_flag:
           shape_val_acc = round(self.shape_val_correct/self.val_size, 6)
@@ -603,18 +568,12 @@ class LightningCLEVRClassifier(pl.LightningModule):
 
   def test_step(self, test_batch, batch_idx):
     with self.logger.experiment.test():
-      inputs, concat_labels, join_labels = test_batch
-      concat_preds, join_preds = self.forward(inputs)
-
-      join_loss = self.bc_entropy_loss(join_preds, join_labels)
-      # Update the number of test join labels correct.
-      self.join_test_correct += vector_label_get_num_correct(join_preds, join_labels)
+      inputs, concat_labels = test_batch
+      concat_preds = self.forward(inputs)
 
       marginal_labels = self.split_lbl_by_properties(concat_labels)
 
-      concat_loss = self.get_loss_by_properties(preds=concat_preds, labels=marginal_labels)
-
-      loss = join_loss + concat_loss
+      loss = self.get_loss_by_properties(preds=concat_preds, labels=marginal_labels)
 
       # Update the number of test correct.
       self.update_acc_by_properties(preds=concat_preds, labels=marginal_labels, eval_mode="test")        
@@ -622,11 +581,6 @@ class LightningCLEVRClassifier(pl.LightningModule):
 
       if batch_idx == self.num_test_batches - 1:
         print(f"Logging Test Accuracy at test_batch {batch_idx}")
-
-        # Log and reset the number of test correct.
-        test_acc = round(self.join_test_correct/self.test_size, 6)
-        self.logger.experiment.log_metric("join_acc", test_acc, step=self.step)
-        self.join_test_correct = 0
 
         if self.shape_flag:
           shape_test_acc = round(self.shape_test_correct/self.test_size, 6)

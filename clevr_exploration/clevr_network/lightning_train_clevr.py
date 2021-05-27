@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser()
 # Input options
 parser.add_argument('--batch_size', default=256, type=int,
     help="Batch size that is passed into the dataloader.")
-parser.add_argument('--num_epochs', default=100, type=int,
+parser.add_argument('--num_epochs', default=50, type=int,
     help="Number of epochs to train the model.")
 parser.add_argument('--lr', type=float, required=True,
 		help="Learning rate used for the optimizer.")

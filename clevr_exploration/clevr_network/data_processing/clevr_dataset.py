@@ -65,5 +65,5 @@ class CLEVRDataset(Dataset):
 		im = np.asarray(im).copy() # This makes it available to be modified.
 		im = self.transform(im)
 
-		concat_label, join_label = get_concat_join_labels(label_path)
-		return (im, concat_label, join_label)
+		concat_label = get_concat_labels(label_path)
+		return (im, concat_label)

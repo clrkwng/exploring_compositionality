@@ -22,19 +22,20 @@ class CLEVRDataModule(pl.LightningDataModule):
 
 	def setup(self, stage):
 		# We use the data augmentations for the training data, but val / test do not use them.
-		self.clevr_dataset_train = CLEVRDataset(folder_path=self.data_dir + f'train{self.em_number}/', train_flag=True, train_disallowed_combos_json=self.train_disallowed_combos_json, train_transforms=self.train_transforms)
+		self.clevr_dataset_train = CLEVRDataset(folder_path=self.data_dir + f'train{self.em_number}/', train_flag=True, \
+																						train_disallowed_combos_json=self.train_disallowed_combos_json, train_transforms=self.train_transforms)
 		self.clevr_dataset_val = CLEVRDataset(folder_path=self.data_dir + f'val{self.em_number}/', train_flag=False)
 		self.clevr_dataset_test = CLEVRDataset(folder_path=self.data_dir + f'test{self.em_number}/', train_flag=False)
 
 	# These are responsible for returning the appropriate data split.
 	def train_dataloader(self):
-		return DataLoader(dataset=self.clevr_dataset_train, batch_size=self.batch_size, shuffle=True, collate_fn=self.my_collate)
+		return DataLoader(dataset=self.clevr_dataset_train, batch_size=self.batch_size, shuffle=True, collate_fn=self.my_collate, num_workers=8)
 
 	def val_dataloader(self):
-		return DataLoader(dataset=self.clevr_dataset_val, shuffle=True, batch_size=self.batch_size)
+		return DataLoader(dataset=self.clevr_dataset_val, shuffle=False, batch_size=self.batch_size, num_workers=8)
 
 	def test_dataloader(self):
-		return DataLoader(dataset=self.clevr_dataset_test, shuffle=True, batch_size=self.batch_size)
+		return DataLoader(dataset=self.clevr_dataset_test, shuffle=False, batch_size=self.batch_size, num_workers=8)
 
 	# Custom collate function to be passed into DataLoader.
 	# To be only used with train dataset.

@@ -64,8 +64,7 @@ def parse_obj_properties_from_json(json_path, task_properties, join_labels_flag)
 
 # Get the labels, based on what is in task_properties.json.
 # This will return (concat_label, join_label).
-def get_concat_join_labels(json_path):
-  join_label_format_lst = []
+def get_concat_labels(json_path):
   concat_label_format_lst = []
 
   # Opening task_properties.json and properties.json files.
@@ -87,18 +86,7 @@ def get_concat_join_labels(json_path):
     if concat_label_format_lst[i] in obj_map:
       concat_label_vec[i] = 1
 
-  # Generate the list of label formats. This label is for the join label.
-  join_label_format_lst = list(itertools.product(*attribute_lst))
-
-  join_label_vec = [0] * len(join_label_format_lst)
-  obj_map = parse_obj_properties_from_json(json_path, task_properties, True)
-  # For now, label_vec is just a boolean vector (denoting presence of a certain tuple or not).
-  # TODO: When looking at presence of N > 1 objects, change the label_vec value to be val of obj_map.
-  for i in range(len(join_label_format_lst)):
-    if join_label_format_lst[i] in obj_map:
-      join_label_vec[i] = 1
-
-  return (np.array(concat_label_vec), np.array(join_label_vec))
+  return np.array(concat_label_vec)
 
 # Process and return the disallowed combos list.
 def get_disallowed_combos_lst(train_disallowed_combos_json):
@@ -166,9 +154,6 @@ def single_label_get_num_correct(preds, labels):
 def vector_label_get_num_correct(preds, labels):
   # Converts logits into 0 or 1.
   preds = (preds > 0).float()
-
-  print(f"A sample prediction: {preds[0]}")
-  print(f"Its corresponding label: {labels[0]}")
 
   # This will sum up the number of correct positions, in each vector.
   # This results in a batch_size length tensor.
