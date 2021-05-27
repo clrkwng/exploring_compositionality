@@ -57,7 +57,7 @@ class CLEVRDataset(Dataset):
 		# If the image contains a disallowed combo, then we reject it.
 		# This will be cleaned up in the collate_fn, defined in clevr_dataloader.py.
 		# Only do this for train dataset.
-		if self.train_flag and scene_has_disallowed_combo(label_path, self.train_disallowed_combos_json):
+		if scene_has_disallowed_combo(label_path, self.train_disallowed_combos_json):
 			return None
 
 		single_image_path = self.image_path + f"CLEVR_new_{str(index).zfill(6)}.png"

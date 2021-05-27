@@ -11,6 +11,7 @@ from utils import *
 
 NUM_CHANNELS = 3
 DISALLOWED_LIST = []
+CONCAT_LABEL_FORMAT_LST = []
 
 # Returns np.array of [num_cubes, num_cylinders, num_spheres] from json_path.
 # Used to serve as the label for each image in CLEVRDataset.
@@ -62,28 +63,41 @@ def parse_obj_properties_from_json(json_path, task_properties, join_labels_flag)
 
   return obj_map
 
-# Get the labels, based on what is in task_properties.json.
-# This will return (concat_label, join_label).
-def get_concat_labels(json_path):
-  concat_label_format_lst = []
+def instantiate_concat_label_format_lst():
+  global CONCAT_LABEL_FORMAT_LST
 
   # Opening task_properties.json and properties.json files.
-  # Change this pathing, depending on if testing in Jupyter Notebook or not.
   with open('data/task_properties.json', 'r') as f:
-    task_properties = json.load(f)  
+    task_properties = json.load(f)
   with open('../clevr-dataset-gen/image_generation/data/properties.json', 'r') as f:
     properties = json.load(f)
 
   attribute_lst = [[k for k, _ in properties[prop].items()] for prop in task_properties]
 
   # Generate list of label formats. This label is for the concat label.
-  concat_label_format_lst = [attribute for prop_list in attribute_lst for attribute in prop_list]
-  concat_label_vec = [0] * len(concat_label_format_lst)
+  CONCAT_LABEL_FORMAT_LST = [attribute for prop_list in attribute_lst for attribute in prop_list]  
+
+# Get the labels, based on what is in task_properties.json.
+# This will return (concat_label, join_label).
+def get_concat_labels(json_path):
+  global CONCAT_LABEL_FORMAT_LST
+
+  # Opening task_properties.json and properties.json files.
+  with open('data/task_properties.json', 'r') as f:
+    task_properties = json.load(f)  
+  
+  # If the CONCAT_LABEL_FORMAT_LST has not been intialized yet, then initialize it.
+  if len(CONCAT_LABEL_FORMAT_LST) == 0:
+    instantiate_concat_label_format_lst()
+
+  assert len(CONCAT_LABEL_FORMAT_LST) != 0, "Should be instantiated"
+  
+  concat_label_vec = [0] * len(CONCAT_LABEL_FORMAT_LST)
   obj_map = parse_obj_properties_from_json(json_path, task_properties, False)
   # For now, label_vec is just a boolean vector (denoting presence of a certain tuple or not).
   # TODO: When looking at presence of N > 1 objects, change the label_vec value to be val of obj_map.
-  for i in range(len(concat_label_format_lst)):
-    if concat_label_format_lst[i] in obj_map:
+  for i in range(len(CONCAT_LABEL_FORMAT_LST)):
+    if CONCAT_LABEL_FORMAT_LST[i] in obj_map:
       concat_label_vec[i] = 1
 
   return np.array(concat_label_vec)
@@ -100,7 +114,6 @@ def scene_has_disallowed_combo(json_path, train_disallowed_combos_json):
   global DISALLOWED_LIST
   if train_disallowed_combos_json and len(DISALLOWED_LIST) == 0:
     DISALLOWED_LIST = get_disallowed_combos_lst(train_disallowed_combos_json)
-    print(f"Disallowed train list: {DISALLOWED_LIST}")
 
   # Data is the map contained in json_path.
   with open(json_path, 'r') as f:
@@ -161,3 +174,23 @@ def vector_label_get_num_correct(preds, labels):
 
   # This gets the number of preds that are completely equal to labels.
   return int((count_correct == labels.shape[1]).float().sum().item())
+
+# Updates the accuracy map passed in, given the list of attributes.
+# Each key value pair in accuracy_map should be: attribute: [attribute_correct, attribute_total].
+def update_accuracy_map(attribute_set, preds, labels, accuracy_map):
+  # Instantiate the CONCAT_LABEL_FORMAT_LST if it is empty.
+  if len(CONCAT_LABEL_FORMAT_LST) == 0:
+    instantiate_concat_label_format_lst()
+
+  for attribute in attribute_set:
+    att_index = CONCAT_LABEL_FORMAT_LST.index(attribute)
+    attribute_correct = vector_label_get_num_correct(preds[:,att_index].reshape(-1,1),
+                                                     labels[:,att_index].reshape(-1,1))
+    attribute_total = len(preds)
+
+    if attribute not in accuracy_map:
+      accuracy_map[attribute] = [0, 0]
+    accuracy_map[attribute][0] += attribute_correct
+    accuracy_map[attribute][1] += attribute_total
+
+  return accuracy_map
