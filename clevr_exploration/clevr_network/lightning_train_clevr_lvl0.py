@@ -67,11 +67,11 @@ def main(args):
 	RGB_MEAN = load_pickle("data/rgb_mean.pickle")
 	RGB_STD = load_pickle("data/rgb_std.pickle")
 	TRAIN_TRANSFORMS = transforms.Compose([
-						# transforms.ToPILImage(),
-						# transforms.RandomHorizontalFlip(p=0.5), 
-						# transforms.RandomVerticalFlip(p=0.5), 
-						# transforms.RandomRotation(degrees=30),
-						# transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
+						transforms.ToPILImage(),
+						transforms.RandomHorizontalFlip(p=0.5), 
+						transforms.RandomVerticalFlip(p=0.5), 
+						transforms.RandomRotation(degrees=30),
+						transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
 						transforms.ToTensor(),
 						transforms.Normalize(
 							mean=RGB_MEAN,

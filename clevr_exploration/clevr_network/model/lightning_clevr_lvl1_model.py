@@ -214,7 +214,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
     if self.scheduler == None:
       return optimizer
     elif self.scheduler == "StepLR":
-      scheduler = optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=5, gamma=0.9)
+      scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[9], gamma=0.9)
     elif self.scheduler == "CosineAnnealingLR":
       scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=self.num_epochs)
     else:

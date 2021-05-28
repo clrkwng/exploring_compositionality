@@ -178,11 +178,16 @@ def obj_has_conflict(size_name, obj_name_out, mat_name_out, color_name):
       return True
   return False
 
-# These global variables are set up in main method.
-NUM_SHAPES = 0
-NUM_OBJ_TUPLES = 0
-# POSS_NUM_OBJ is the possible tuples that we will sample num_objects from.
-POSS_NUM_OBJ = 0
+# Toggle this flag if using the 'balanced' number of shapes.
+balanced_num_shapes_flag = False
+
+if balanced_num_shapes_flag:
+  # These global variables are set up in main method.
+  NUM_SHAPES = 0
+  NUM_OBJ_TUPLES = 0
+  # POSS_NUM_OBJ is the possible tuples that we will sample num_objects from.
+  POSS_NUM_OBJ = 0
+
 # DISALLOWED_LIST is map returned from process_disallowed_combos.
 DISALLOWED_LIST = []
 
@@ -203,15 +208,16 @@ def main(args):
   if args.save_blendfiles == 1 and not os.path.isdir(args.output_blend_dir):
     os.makedirs(args.output_blend_dir)
 
-  # Set up the global variables.
-  global NUM_SHAPES
-  NUM_SHAPES = get_num_property(args.properties_json, 'shapes')
+  if balanced_num_shapes_flag:
+    # Set up the global variables.
+    global NUM_SHAPES
+    NUM_SHAPES = get_num_property(args.properties_json, 'shapes')
 
-  global NUM_OBJ_TUPLES
-  NUM_OBJ_TUPLES = [e for e in product(range(0,11), repeat=NUM_SHAPES)]
-  
-  global POSS_NUM_OBJ
-  POSS_NUM_OBJ = [x for x in NUM_OBJ_TUPLES if sum(x) <= 10]
+    global NUM_OBJ_TUPLES
+    NUM_OBJ_TUPLES = [e for e in product(range(0,11), repeat=NUM_SHAPES)]
+    
+    global POSS_NUM_OBJ
+    POSS_NUM_OBJ = [x for x in NUM_OBJ_TUPLES if sum(x) <= 10]
 
   if args.disallowed_combos_json is not None:
     global DISALLOWED_LIST
@@ -225,10 +231,13 @@ def main(args):
     blend_path = None
     if args.save_blendfiles == 1:
       blend_path = blend_template % (i + args.start_idx)
-    # num_objects = random.randint(args.min_objects, args.max_objects)
-    # Here, grab a uniform random number for num_cubes, num_cylinders, num_spheres in [0,10]
-    num_objects = POSS_NUM_OBJ[np.random.randint(0, len(POSS_NUM_OBJ))]
-    # print(f"Rendering {num_objects}\n")
+
+    if balanced_num_shapes_flag:
+      # Here, grab a uniform random number for num_cubes, num_cylinders, num_spheres in [0,10]
+      num_objects = POSS_NUM_OBJ[np.random.randint(0, len(POSS_NUM_OBJ))]
+    else:
+      num_objects = random.randint(args.min_objects, args.max_objects)
+
     render_scene(args,
       num_objects=num_objects,
       output_index=(i + args.start_idx),
@@ -257,8 +266,7 @@ def main(args):
     json.dump(output, f)
 
 def render_scene(args,
-    # num_objects=5,
-    num_objects=[3,3,3],
+    num_objects=[3,3,3] if balanced_num_shapes_flag else 5,
     output_index=0,
     output_split='none',
     output_image='render.png',
@@ -400,10 +408,14 @@ def add_random_objects(scene_struct, num_objects, args, camera):
   positions = []
   objects = []
   blender_objects = []
-  chosen_objects = [object_mapping[j] for j in range(NUM_SHAPES) for _ in range(num_objects[j])]
+  
+  if balanced_num_shapes_flag:
+    chosen_objects = [object_mapping[j] for j in range(NUM_SHAPES) for _ in range(num_objects[j])]
+    range_num = sum(num_objects)
+  else:
+    range_num = num_objects
 
-  # for i in range(num_objects):
-  for i in range(sum(num_objects)):
+  for i in range(range_num):
     # Choose a random size
     size_name, r = random.choice(size_mapping)
 
@@ -451,7 +463,10 @@ def add_random_objects(scene_struct, num_objects, args, camera):
       # Need to change this line to just choose one of the pre-chosen shapes.
       # obj_name, obj_name_out = random.choice(object_mapping)
       # Here, obj_name_out is "cube", "sphere", or "cylinder"
-      obj_name, obj_name_out = chosen_objects[i]
+      if balanced_num_shapes_flag:
+        obj_name, obj_name_out = chosen_objects[i]
+      else:
+        obj_name, obj_name_out = random.choice(object_mapping)
       color_name, rgba = random.choice(list(color_name_to_rgba.items()))
     else:
       obj_name_out, color_choices = random.choice(shape_color_combos)
