@@ -171,7 +171,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
     # NOTE: These are hard-coded, since in level 1 we exclude ["small", "rubber"].
     self.out_dist_val_size, self.out_dist_test_size = out_dist_val_size, out_dist_test_size
     self.num_out_dist_val_batches = math.ceil(1.0 * self.out_dist_val_size / self.batch_size)
-    self.num_out_dist_train_batches = math.ceil(1.0 * self.out_dist_test_size / self.batch_size)
+    self.num_out_dist_test_batches = math.ceil(1.0 * self.out_dist_test_size / self.batch_size)
     self.attribute_set = set(["cube", "sphere", "cylinder", "rubber", "metal"])
     self.val_attribute_accuracy_map = {}
     self.test_attribute_accuracy_map = {}
@@ -593,7 +593,13 @@ class LightningCLEVRClassifier(pl.LightningModule):
           for attribute, counts in self.val_attribute_accuracy_map.items():
             att_acc = round(counts[0]/counts[1], 6)
             self.logger.experiment.log_metric(f"out_dist_{attribute}_acc", att_acc, step=self.step)
+
+            zero_correct, zero_total, one_correct, one_total = counts[2]
+            fair_att_acc = round(0.5 * (zero_correct/zero_total + one_correct/one_total), 6)
+            self.logger.experiment.log_metric(f"out_dist_fair_{attribute}_acc", fair_att_acc, step=self.step)
+
           self.val_attribute_accuracy_map.clear()
+
 
   def test_step(self, test_batch, batch_idx, dataset_idx):
     with self.logger.experiment.test():
@@ -675,4 +681,9 @@ class LightningCLEVRClassifier(pl.LightningModule):
           for attribute, counts in self.test_attribute_accuracy_map.items():
             att_acc = round(counts[0]/counts[1], 6)
             self.logger.experiment.log_metric(f"out_dist_{attribute}_acc", att_acc, step=self.step)
+
+            zero_correct, zero_total, one_correct, one_total = counts[2]
+            fair_att_acc = round(0.5 * (zero_correct/zero_total + one_correct/one_total), 6)
+            self.logger.experiment.log_metric(f"out_dist_fair_{attribute}_acc", fair_att_acc, step=self.step)
+
           self.test_attribute_accuracy_map.clear()

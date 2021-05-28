@@ -189,8 +189,26 @@ def update_accuracy_map(attribute_set, preds, labels, accuracy_map):
     attribute_total = len(preds)
 
     if attribute not in accuracy_map:
-      accuracy_map[attribute] = [0, 0]
+      accuracy_map[attribute] = [0, 0, 0]
     accuracy_map[attribute][0] += attribute_correct
     accuracy_map[attribute][1] += attribute_total
+    accuracy_map[attribute][2] = get_fair_counts(preds, labels)
 
   return accuracy_map
+
+# Returns a list in the form: (zero_correct, zero_total, one_correct, one_total).
+def get_fair_counts(preds, labels):
+  np_lbls = tensor_to_numpy(labels)
+
+  zero_indices = [i for i, x in enumerate(np_lbls) if np.all(x == 0)]
+  zero_total = len(zero_indices)
+  zero_correct = vector_label_get_num_correct(preds[zero_indices], labels[zero_indices])
+
+  one_indices = [i for i, x in enumerate(np_lbls) if np.all(x == 1)]
+  one_total = len(one_indices)
+  one_correct = vector_label_get_num_correct(preds[one_indices], labels[one_indices])
+  
+  assert zero_total + one_total == len(preds) and len(preds) == len(labels), "Missed some labels/predictions."
+  return (zero_correct, zero_total, one_correct, one_total)
+
+  
