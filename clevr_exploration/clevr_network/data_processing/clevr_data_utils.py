@@ -2,7 +2,7 @@
 This file provides different methods that are used across the CLEVR dataset exploration.
 """
 
-import glob, json, itertools
+import glob, json, operator
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
@@ -182,6 +182,8 @@ def update_accuracy_map(attribute_set, preds, labels, accuracy_map):
   if len(CONCAT_LABEL_FORMAT_LST) == 0:
     instantiate_concat_label_format_lst()
 
+  assert len(CONCAT_LABEL_FORMAT_LST) != 0, "Length of CONCAT_LABEL_FORMAT_LST is 0."
+
   for attribute in attribute_set:
     att_index = CONCAT_LABEL_FORMAT_LST.index(attribute)
     attribute_correct = vector_label_get_num_correct(preds[:,att_index].reshape(-1,1),
@@ -189,15 +191,28 @@ def update_accuracy_map(attribute_set, preds, labels, accuracy_map):
     attribute_total = len(preds)
 
     if attribute not in accuracy_map:
-      accuracy_map[attribute] = [0, 0, 0]
+      accuracy_map[attribute] = [0, 0, (0,0,0,0)]
+
     accuracy_map[attribute][0] += attribute_correct
     accuracy_map[attribute][1] += attribute_total
-    accuracy_map[attribute][2] = get_fair_counts(preds, labels)
+
+    tuple_a = get_fair_counts(preds[:,att_index].reshape(-1,1), 
+                              labels[:,att_index].reshape(-1,1))
+    tuple_b = accuracy_map[attribute][2]
+    accuracy_map[attribute][2] = tuple(map(operator.add, tuple_a, tuple_b))
+
+    assert accuracy_map[attribute][0] == (accuracy_map[attribute][2][0] + accuracy_map[attribute][2][2]), \
+					 "Number correct labels does not add up."
+
+    assert accuracy_map[attribute][1] == (accuracy_map[attribute][2][1] + accuracy_map[attribute][2][3]), \
+					 "Number of total labels does not add up."
 
   return accuracy_map
 
 # Returns a list in the form: (zero_correct, zero_total, one_correct, one_total).
 def get_fair_counts(preds, labels):
+  assert len(preds) == len(labels), "preds and labels should be same length."
+
   np_lbls = tensor_to_numpy(labels)
 
   zero_indices = [i for i, x in enumerate(np_lbls) if np.all(x == 0)]
@@ -208,7 +223,7 @@ def get_fair_counts(preds, labels):
   one_total = len(one_indices)
   one_correct = vector_label_get_num_correct(preds[one_indices], labels[one_indices])
   
-  assert zero_total + one_total == len(preds) and len(preds) == len(labels), "Missed some labels/predictions."
+  assert (zero_total + one_total) == len(preds), "Missed some labels/predictions."
   return (zero_correct, zero_total, one_correct, one_total)
 
   

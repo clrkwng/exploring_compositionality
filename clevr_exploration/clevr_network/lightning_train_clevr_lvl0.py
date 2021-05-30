@@ -39,7 +39,7 @@ parser.add_argument('--optimizer', required=True,
 		help="Optimizer used, must choose one of SGD/Adam.")
 
 parser.add_argument('--em_number', required=True, type=int,
-		help="Currently supports em2/em3 for train/val/test data.")
+		help="Currently supports em2/em3 for train/val data.")
 
 def main(args):
 	comet_api_key = '5zqkkwKFbkhDgnFn7Alsby6py'
@@ -71,7 +71,7 @@ def main(args):
 						transforms.RandomHorizontalFlip(p=0.5), 
 						transforms.RandomVerticalFlip(p=0.5), 
 						transforms.RandomRotation(degrees=30),
-						transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
+						# transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
 						transforms.ToTensor(),
 						transforms.Normalize(
 							mean=RGB_MEAN,
@@ -79,12 +79,11 @@ def main(args):
 						),
 					])
 					
-	# Grabs the number of images used in train, val, test.
+	# Grabs the number of images used in train, val.
 	# Even with data augmentation, since the dataset is "dynamically" augmented, it's fine to
 	# supply the sizes of each dataset manually.
 	train_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/train{em_number}/images/')])
 	val_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/val{em_number}/images/')])
-	test_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/test{em_number}/images/')])
 
 	if TRAIN_DISALLOWED_COMBOS_JSON is not None:
 		disallowed_combos_lst = get_disallowed_combos_lst(TRAIN_DISALLOWED_COMBOS_JSON)
@@ -120,21 +119,20 @@ def main(args):
 																	 num_epochs=NUM_EPOCHS,
 																	 train_size=train_size,
 																	 val_size=val_size,
-																	 test_size=test_size,
 																	 optimizer=OPTIMIZER,
 																	 lr=LR,
 																	 momentum=MOMENTUM,
-																	 scheduler=SCHEDULER)
+																	 scheduler=SCHEDULER,
+																	 save_path='data/lvl0_TEST_model_dict.pt')
 	trainer = pl.Trainer(
 		gpus=1,
 		profiler="simple",
 		logger=comet_logger,
 		num_sanity_val_steps=0,
-		check_val_every_n_epoch=1,
+		check_val_every_n_epoch=5,
 		max_epochs=NUM_EPOCHS,
 	)
 	trainer.fit(model, data_module)
-	trainer.test()
 
 if __name__ == "__main__":
 	if '--help' in sys.argv or '-h' in sys.argv:

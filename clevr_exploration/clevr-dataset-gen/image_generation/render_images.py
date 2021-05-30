@@ -68,6 +68,8 @@ parser.add_argument('--disallowed_combos_json', default=None,
     help="Optional path to a JSON file containing pairs of disallowed object " +
          "property pairs. For instance, adding the pair: ('yellow', 'cylinder')" + 
          "will exclude any yellow cylinders from being generated.")
+parser.add_argument('--property_combo', default=None,
+    help="Used for scenes, images, and properties name.")
 
 # Settings for objects
 parser.add_argument('--min_objects', default=3, type=int,
@@ -192,6 +194,11 @@ if balanced_num_shapes_flag:
 DISALLOWED_LIST = []
 
 def main(args):
+  if args.property_combo is not None:
+    args.output_image_dir = '../output/clevr_datasets/' + args.property_combo + '/images/'
+    args.output_scene_dir = '../output/clevr_datasets/' + args.property_combo + '/scenes/'
+    args.properties_json = 'data/lvl1_properties/' + args.property_combo + '_properties.json'
+
   num_digits = 6
   prefix = '%s_%s_' % (args.filename_prefix, args.split)
   img_template = '%s%%0%dd.png' % (prefix, num_digits)

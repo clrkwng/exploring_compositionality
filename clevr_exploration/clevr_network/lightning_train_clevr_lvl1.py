@@ -38,7 +38,7 @@ parser.add_argument('--momentum', type=float, required=True,
 parser.add_argument('--optimizer', required=True,
 		help="Optimizer used, must choose one of SGD/Adam.")
 parser.add_argument('--em_number', required=True, type=int,
-		help="Currently supports em2/em3 for train/val/test data.")
+		help="Currently supports em2/em3 for train/val data.")
 
 def main(args):
 	comet_api_key = '5zqkkwKFbkhDgnFn7Alsby6py'
@@ -70,7 +70,7 @@ def main(args):
 						transforms.RandomHorizontalFlip(p=0.5), 
 						transforms.RandomVerticalFlip(p=0.5), 
 						transforms.RandomRotation(degrees=30),
-						transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
+						# transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
 						transforms.ToTensor(),
 						transforms.Normalize(
 							mean=RGB_MEAN,
@@ -78,14 +78,12 @@ def main(args):
 						),
 					])
 					
-	# Grabs the number of images used in train, val, test.
+	# Grabs the number of images used in train, val.
 	# Even with data augmentation, since the dataset is "dynamically" augmented, it's fine to
 	# supply the sizes of each dataset manually.
 	train_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/train{em_number}/images/')])
 	val_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/val{em_number}/images/')])
-	out_dist_val_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/lvl1_data/lvl1_val/images/')])
-	test_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/test{em_number}/images/')])
-	out_dist_test_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/lvl1_data/lvl1_test/images/')])
+	out_dist_val_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/lvl1_data{em_number}/lvl1_val/images/')])
 
 	if TRAIN_DISALLOWED_COMBOS_JSON is not None:
 		disallowed_combos_lst = get_disallowed_combos_lst(TRAIN_DISALLOWED_COMBOS_JSON)
@@ -95,16 +93,16 @@ def main(args):
 
 	# Log these params into comet.ml for easier view.
 	params = {
-		"em_number": em_number,
-		"batch_size": BATCH_SIZE,
-		"lr": LR,
-		"momentum": MOMENTUM,
-		"num_epochs": NUM_EPOCHS,
-		"optimizer": OPTIMIZER,
-		"scheduler": SCHEDULER,
 		"resnet18_flag": RESNET18_FLAG,
 		"train_transforms": TRAIN_TRANSFORMS,
-		"train_disallowed_combos_lst": [list(c) for c in disallowed_combos_lst] # Since set is not JSON serializable.
+		"optimizer": OPTIMIZER,
+		"lr": LR,
+		"momentum": MOMENTUM,
+		"scheduler": SCHEDULER,
+		"train_disallowed_combos_lst": [list(c) for c in disallowed_combos_lst], # Since set is not JSON serializable.
+		"em_number": em_number,
+		"batch_size": BATCH_SIZE,
+		"num_epochs": NUM_EPOCHS,
 	}
 
 	comet_logger.log_hyperparams(params)
@@ -123,12 +121,11 @@ def main(args):
 																	 train_size=train_size,
 																	 val_size=val_size,
 																	 out_dist_val_size=out_dist_val_size,
-																	 test_size=test_size,
-																	 out_dist_test_size=out_dist_test_size,
 																	 optimizer=OPTIMIZER,
 																	 lr=LR,
 																	 momentum=MOMENTUM,
-																	 scheduler=SCHEDULER)
+																	 scheduler=SCHEDULER,
+																	 save_path='data/lvl1_best_model_dict.pt')
 	trainer = pl.Trainer(
 		gpus=1,
 		profiler="simple",
@@ -138,7 +135,6 @@ def main(args):
 		max_epochs=NUM_EPOCHS,
 	)
 	trainer.fit(model, data_module)
-	trainer.test()
 
 if __name__ == "__main__":
 	if '--help' in sys.argv or '-h' in sys.argv:

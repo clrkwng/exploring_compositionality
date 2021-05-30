@@ -1,0 +1,16 @@
+{
+  "shapes": {
+    "cylinder": "SmoothCylinder"
+  },
+  "colors": {
+    "purple": [129, 38, 192]
+  },
+  "materials": {
+    "rubber": "Rubber",
+    "metal": "MyMetal"
+  },
+  "sizes": {
+    "large": 0.7,
+    "small": 0.35
+  }
+}
