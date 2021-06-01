@@ -2,7 +2,7 @@
 This file provides different methods that are used across the CLEVR dataset exploration.
 """
 
-import glob, json, operator
+import glob, json, operator, sys
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
@@ -165,6 +165,8 @@ def single_label_get_num_correct(preds, labels):
 
 # This works when label is a vector, and the prediction is logits.
 def vector_label_get_num_correct(preds, labels):
+  preds, labels = preds.cuda(), labels.cuda()
+
   # Converts logits into 0 or 1.
   preds = (preds > 0).float()
 
@@ -176,7 +178,7 @@ def vector_label_get_num_correct(preds, labels):
   return int((count_correct == labels.shape[1]).float().sum().item())
 
 # Updates the accuracy map passed in, given the list of attributes.
-# Each key value pair in accuracy_map should be: attribute: [attribute_correct, attribute_total].
+# Each key value pair in accuracy_map should be: attribute: [attribute_correct, attribute_total, (get_fair_counts(preds, labels))].
 def update_accuracy_map(attribute_set, preds, labels, accuracy_map):
   # Instantiate the CONCAT_LABEL_FORMAT_LST if it is empty.
   if len(CONCAT_LABEL_FORMAT_LST) == 0:
@@ -202,10 +204,10 @@ def update_accuracy_map(attribute_set, preds, labels, accuracy_map):
     accuracy_map[attribute][2] = tuple(map(operator.add, tuple_a, tuple_b))
 
     assert accuracy_map[attribute][0] == (accuracy_map[attribute][2][0] + accuracy_map[attribute][2][2]), \
-					 "Number correct labels does not add up."
+           "Number correct labels does not add up."
 
     assert accuracy_map[attribute][1] == (accuracy_map[attribute][2][1] + accuracy_map[attribute][2][3]), \
-					 "Number of total labels does not add up."
+           "Number of total labels does not add up."
 
   return accuracy_map
 
@@ -226,4 +228,70 @@ def get_fair_counts(preds, labels):
   assert (zero_total + one_total) == len(preds), "Missed some labels/predictions."
   return (zero_correct, zero_total, one_correct, one_total)
 
+# This gets the fair accuracies from faircorrect_map and count_map.
+# Also, clears the two maps.
+def get_fair_acc(faircorrect_map, count_map):
+  assert len(faircorrect_map) == len(count_map), "Maps are not the same size."
+
+  fair_acc = 0
+
+  for lbl, correct_count in faircorrect_map.items():
+    total_count = count_map[lbl]
+    assert total_count >= correct_count, "Incorrectly incremented map."
+    fair_acc += (correct_count / total_count)
+  fair_acc /= len(count_map)
   
+  faircorrect_map.clear()
+  count_map.clear()
+
+  return fair_acc
+
+# This method takes in a list of combos, sorts each combo alphabetically, then concats with underscore.
+# For instance, ["yellow", "cylinder", "small"] -> "cylinder_small_yellow".
+def concat_combos_lst(combos_lst):
+  concat_lst = []
+  for c in combos_lst:
+    c = sorted(list(c))
+    concat_lst.append('_'.join(c))
+  return concat_lst
+
+# Given a list of disallowed combos, return: 
+# map of disallowed_combo key -> attributes to test.
+# map of disallowed_combo key -> attribute_accuracy_map.
+def get_attributes_to_test(disallowed_combos_lst):
+  with open('../clevr-dataset-gen/image_generation/data/properties.json', 'r') as f:
+    properties = json.load(f)
+
+  # Reformat properties into a hashmap that I can use.
+  shapes = set(properties["shapes"].keys())
+  colors = set(properties["colors"].keys())
+  materials = set(properties["materials"].keys())
+  sizes = set(properties["sizes"].keys())
+
+  properties = {"shapes": shapes, "colors": colors, "materials": materials, "sizes": sizes}
+
+  attribute_accuracy_map = {}    
+  map_of_attribute_sets = {}
+
+  concat_disallowed_combos = concat_combos_lst(disallowed_combos_lst)
+  for combo, concat_combo in zip(disallowed_combos_lst, concat_disallowed_combos):
+    prop_lst = ["shapes", "colors", "materials", "sizes"]
+    for attribute in combo:
+      if attribute in shapes:
+        prop_lst.remove("shapes")
+      elif attribute in colors:
+        prop_lst.remove("colors")
+      elif attribute in materials:
+        prop_lst.remove("materials")
+      elif attribute in sizes:
+        prop_lst.remove("sizes")
+      else:
+        print(f"A disallowed attribute was not in any property list.")
+        sys.exit(-1)
+
+    # Get all the attributes from properties that don't contain the disallowed attributes.  
+    attribute_set = set([att for prop in prop_lst for att in properties[prop]])
+    map_of_attribute_sets[concat_combo] = attribute_set
+    attribute_accuracy_map[concat_combo] = {}
+
+  return map_of_attribute_sets, attribute_accuracy_map

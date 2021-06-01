@@ -27,16 +27,16 @@ parser.add_argument('--resnet18_flag', default='False',
 		help="True if using resnet18, else False for miniresnet18.")
 parser.add_argument('--scheduler', default=None,
 		help="Input options are StepLR/CosineAnnealingLR/None for the optimizer scheduler.")
-parser.add_argument('--train_disallowed_combos_json', default='data/lvl1_disallowed_combos.json',
-		help="Optional path to a JSON file containing combos that are not allowed in the \
-		      train data set. This is used for each level of experimentation.")
-		
-parser.add_argument('--lr', type=float, required=True,
+parser.add_argument('--lr', type=float, default=0.1,
 		help="Learning rate used for the optimizer.")
-parser.add_argument('--momentum', type=float, required=True,
+parser.add_argument('--momentum', type=float, default=0.9,
     help="Momentum used for SGD. If Adam is used, then this argument is ignored.")
-parser.add_argument('--optimizer', required=True,
+parser.add_argument('--optimizer', default='SGD',
 		help="Optimizer used, must choose one of SGD/Adam.")
+
+parser.add_argument('--train_disallowed_combos_json', required=True,
+		help="Path to a JSON file containing combos that are not allowed in the \
+		      train data set. This is used for each level of experimentation.")
 parser.add_argument('--em_number', required=True, type=int,
 		help="Currently supports em2/em3 for train/val data.")
 
@@ -70,26 +70,30 @@ def main(args):
 						transforms.RandomHorizontalFlip(p=0.5), 
 						transforms.RandomVerticalFlip(p=0.5), 
 						transforms.RandomRotation(degrees=30),
-						# transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
+						transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
 						transforms.ToTensor(),
 						transforms.Normalize(
 							mean=RGB_MEAN,
 							std=RGB_STD,
 						),
 					])
-					
-	# Grabs the number of images used in train, val.
-	# Even with data augmentation, since the dataset is "dynamically" augmented, it's fine to
-	# supply the sizes of each dataset manually.
-	train_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/train{em_number}/images/')])
-	val_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/val{em_number}/images/')])
-	out_dist_val_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/lvl1_data{em_number}/lvl1_val/images/')])
 
 	if TRAIN_DISALLOWED_COMBOS_JSON is not None:
 		disallowed_combos_lst = get_disallowed_combos_lst(TRAIN_DISALLOWED_COMBOS_JSON)
 	else:
 		disallowed_combos_lst = []
 	print(f"Train disallowed combos: {disallowed_combos_lst}")
+
+	data_dir = '../clevr-dataset-gen/output/'
+					
+	# Grabs the number of images used in train, val.
+	# Even with data augmentation, since the dataset is "dynamically" augmented, it's fine to
+	# supply the sizes of each dataset manually.
+	train_size = len([n for n in os.listdir(f'{data_dir}base-clevr-data{em_number}/train/images/')])
+	val_size = len([n for n in os.listdir(f'{data_dir}base-clevr-data{em_number}/val/images/')])
+
+	# TODO: Change this when the datasets are set in stone.
+	out_dist_val_size = 12500
 
 	# Log these params into comet.ml for easier view.
 	params = {
@@ -107,12 +111,14 @@ def main(args):
 
 	comet_logger.log_hyperparams(params)
 
-	data_module = CLEVRDataModule(data_dir='../clevr-dataset-gen/output/',
+	concat_disallowed_combos = concat_combos_lst(disallowed_combos_lst)
+	data_module = CLEVRDataModule(data_dir=data_dir,
 																em_number=em_number,
 																batch_size=BATCH_SIZE, 
 																train_transforms=TRAIN_TRANSFORMS, 
 																train_disallowed_combos_json=TRAIN_DISALLOWED_COMBOS_JSON,
-																lvl1_flag=True)
+																lvl1_flag=True,
+																concat_disallowed_combos=concat_disallowed_combos)
 	model = LightningCLEVRClassifier(resnet18_flag=RESNET18_FLAG,
 																	 layers=[1, 1, 1, 1], 
 																	 image_channels=3, 
@@ -125,7 +131,8 @@ def main(args):
 																	 lr=LR,
 																	 momentum=MOMENTUM,
 																	 scheduler=SCHEDULER,
-																	 save_path='data/lvl1_best_model_dict.pt')
+																	 save_path='data/lvl1_best_model_dict.pt',
+																	 disallowed_combos_lst=disallowed_combos_lst)
 	trainer = pl.Trainer(
 		gpus=1,
 		profiler="simple",

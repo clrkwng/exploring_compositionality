@@ -71,7 +71,7 @@ def main(args):
 						transforms.RandomHorizontalFlip(p=0.5), 
 						transforms.RandomVerticalFlip(p=0.5), 
 						transforms.RandomRotation(degrees=30),
-						# transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
+						transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
 						transforms.ToTensor(),
 						transforms.Normalize(
 							mean=RGB_MEAN,
@@ -82,8 +82,9 @@ def main(args):
 	# Grabs the number of images used in train, val.
 	# Even with data augmentation, since the dataset is "dynamically" augmented, it's fine to
 	# supply the sizes of each dataset manually.
-	train_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/train{em_number}/images/')])
-	val_size = len([n for n in os.listdir(f'../clevr-dataset-gen/output/val{em_number}/images/')])
+	data_dir = '../clevr-dataset-gen/output/'
+	train_size = len([n for n in os.listdir(f'{data_dir}base-clevr-data{em_number}/train/images/')])
+	val_size = len([n for n in os.listdir(f'{data_dir}base-clevr-data{em_number}/val/images/')])
 
 	if TRAIN_DISALLOWED_COMBOS_JSON is not None:
 		disallowed_combos_lst = get_disallowed_combos_lst(TRAIN_DISALLOWED_COMBOS_JSON)
@@ -107,7 +108,7 @@ def main(args):
 
 	comet_logger.log_hyperparams(params)
 
-	data_module = CLEVRDataModule(data_dir='../clevr-dataset-gen/output/',
+	data_module = CLEVRDataModule(data_dir=data_dir,
 																em_number=em_number,
 																batch_size=BATCH_SIZE, 
 																train_transforms=TRAIN_TRANSFORMS, 
@@ -123,7 +124,7 @@ def main(args):
 																	 lr=LR,
 																	 momentum=MOMENTUM,
 																	 scheduler=SCHEDULER,
-																	 save_path='data/lvl0_TEST_model_dict.pt')
+																	 save_path='data/lvl0_baseline_model_dict.pt')
 	trainer = pl.Trainer(
 		gpus=1,
 		profiler="simple",

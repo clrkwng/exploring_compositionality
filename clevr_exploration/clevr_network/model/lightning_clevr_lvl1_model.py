@@ -51,7 +51,8 @@ class ResBlock(pl.LightningModule):
     return x
 
 class LightningCLEVRClassifier(pl.LightningModule):
-  def __init__(self, resnet18_flag, layers, image_channels, batch_size, num_epochs, train_size, val_size, out_dist_val_size, optimizer, lr, momentum, scheduler, save_path):
+  def __init__(self, resnet18_flag, layers, image_channels, batch_size, num_epochs, train_size, val_size, \
+               out_dist_val_size, optimizer, lr, momentum, scheduler, save_path, disallowed_combos_lst):
     super().__init__()
 
     self.optimizer = optimizer
@@ -105,6 +106,16 @@ class LightningCLEVRClassifier(pl.LightningModule):
                                       nn.Linear(32, 8),\
                                       nn.ReLU(),\
                                       nn.Linear(8, 3))
+
+      # These hashmaps are used for calculating the "fair" metric accuracy.
+      # The faircorrect_maps are used to increment the number of correct predictions for train/val.
+      # The count_maps are used to increment the number of times that label appears in train/val.
+      self.shape_train_faircorrect_map = {}
+      self.shape_val_faircorrect_map = {}
+
+      self.shape_train_count_map = {}
+      self.shape_val_count_map = {}
+
     if self.color_flag:
       self.color_train_correct, self.color_val_correct = 0, 0
       self.color_layers = nn.Sequential(nn.Linear(512, 256),\
@@ -112,6 +123,16 @@ class LightningCLEVRClassifier(pl.LightningModule):
                                       nn.Linear(256, 32),\
                                       nn.ReLU(),\
                                       nn.Linear(32, 8))
+
+      # These hashmaps are used for calculating the "fair" metric accuracy.
+      # The faircorrect_maps are used to increment the number of correct predictions for train/val.
+      # The count_maps are used to increment the number of times that label appears in train/val.
+      self.color_train_faircorrect_map = {}
+      self.color_val_faircorrect_map = {}
+
+      self.color_train_count_map = {}
+      self.color_val_count_map = {}
+
     if self.material_flag:
       self.material_train_correct, self.material_val_correct = 0, 0
       self.material_layers = nn.Sequential(nn.Linear(512, 256),\
@@ -166,8 +187,10 @@ class LightningCLEVRClassifier(pl.LightningModule):
     # NOTE: These are hard-coded, since in level 1 we exclude ["small", "rubber"].
     self.out_dist_val_size = out_dist_val_size
     self.num_out_dist_val_batches = math.ceil(1.0 * self.out_dist_val_size / self.batch_size)
-    self.attribute_set = set(["cube", "sphere", "cylinder", "rubber", "metal"])
-    self.val_attribute_accuracy_map = {}
+
+    self.disallowed_combos_lst = disallowed_combos_lst
+    self.concat_disallowed_combos = concat_combos_lst(self.disallowed_combos_lst)
+    self.map_of_attribute_sets, self.val_attribute_accuracy_map = get_attributes_to_test(self.disallowed_combos_lst)
 
   def _make_layer(self, num_residual_blocks, intermediate_channels, stride):
     identity_downsample = None
@@ -289,7 +312,21 @@ class LightningCLEVRClassifier(pl.LightningModule):
       # Now, update the appropriate map with the number of correct predictions.
       map_key = tuple(u_lbl)
       if run_flag == "train":
-        if prop == "material":
+        if prop == "shape":
+          if map_key not in self.shape_train_faircorrect_map: self.shape_train_faircorrect_map[map_key] = 0
+          self.shape_train_faircorrect_map[map_key] += num_correct
+
+          if map_key not in self.shape_train_count_map: self.shape_train_count_map[map_key] = 0
+          self.shape_train_count_map[map_key] += num_lbls
+
+        elif prop == "color":
+          if map_key not in self.color_train_faircorrect_map: self.color_train_faircorrect_map[map_key] = 0
+          self.color_train_faircorrect_map[map_key] += num_correct
+
+          if map_key not in self.color_train_count_map: self.color_train_count_map[map_key] = 0
+          self.color_train_count_map[map_key] += num_lbls
+
+        elif prop == "material":
           if map_key not in self.material_train_faircorrect_map: self.material_train_faircorrect_map[map_key] = 0
           self.material_train_faircorrect_map[map_key] += num_correct
 
@@ -308,7 +345,21 @@ class LightningCLEVRClassifier(pl.LightningModule):
           sys.exit(-1)
 
       elif run_flag == "val":
-        if prop == "material":
+        if prop == "shape":
+          if map_key not in self.shape_val_faircorrect_map: self.shape_val_faircorrect_map[map_key] = 0
+          self.shape_val_faircorrect_map[map_key] += num_correct
+
+          if map_key not in self.shape_val_count_map: self.shape_val_count_map[map_key] = 0
+          self.shape_val_count_map[map_key] += num_lbls
+
+        elif prop == "color":
+          if map_key not in self.color_val_faircorrect_map: self.color_val_faircorrect_map[map_key] = 0
+          self.color_val_faircorrect_map[map_key] += num_correct
+
+          if map_key not in self.color_val_count_map: self.color_val_count_map[map_key] = 0
+          self.color_val_count_map[map_key] += num_lbls
+
+        elif prop == "material":
           if map_key not in self.material_val_faircorrect_map: self.material_val_faircorrect_map[map_key] = 0
           self.material_val_faircorrect_map[map_key] += num_correct
 
@@ -340,6 +391,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
     idx = 0
     if self.shape_flag:
       shape_correct = vector_label_get_num_correct(preds[idx], labels[idx])
+      self.update_fair_count(preds=preds[idx], lbls=labels[idx], prop="shape", run_flag=eval_mode)
       if eval_mode == "train": self.shape_train_correct += shape_correct
       elif eval_mode == "val": self.shape_val_correct += shape_correct
       else:
@@ -348,6 +400,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
       idx += 1
     if self.color_flag:
       color_correct = vector_label_get_num_correct(preds[idx], labels[idx])
+      self.update_fair_count(preds=preds[idx], lbls=labels[idx], prop="color", run_flag=eval_mode)
       if eval_mode == "train": self.color_train_correct += color_correct
       elif eval_mode == "val": self.color_val_correct += color_correct
       else:
@@ -431,26 +484,23 @@ class LightningCLEVRClassifier(pl.LightningModule):
         self.logger.experiment.log_metric("shape_train_acc", shape_train_acc, step=self.step)
         self.shape_train_correct = 0
 
+        shape_train_fair_acc = get_fair_acc(self.shape_train_faircorrect_map, self.shape_train_count_map)
+        self.logger.experiment.log_metric("shape_train_fair_acc", shape_train_fair_acc, step=self.step)
+
       if self.color_flag:
         color_train_acc = round(self.color_train_correct/self.train_size, 6)
         self.logger.experiment.log_metric("color_train_acc", color_train_acc, step=self.step)
         self.color_train_correct = 0
+
+        color_train_fair_acc = get_fair_acc(self.color_train_faircorrect_map, self.color_train_count_map)
+        self.logger.experiment.log_metric("color_train_fair_acc", color_train_fair_acc, step=self.step)
 
       if self.material_flag:
         material_train_acc = round(self.material_train_correct/self.train_size, 6)
         self.logger.experiment.log_metric("material_train_acc", material_train_acc, step=self.step)
         self.material_train_correct = 0
 
-        material_train_fair_acc = 0
-        for lbl, correct_count in self.material_train_faircorrect_map.items():
-          total_count = self.material_train_count_map[lbl]
-          assert total_count >= correct_count, "Incorrectly incremented maps."
-          material_train_fair_acc += correct_count / total_count
-        material_train_fair_acc /= len(self.material_train_count_map)
-
-        self.material_train_faircorrect_map.clear()
-        self.material_train_count_map.clear()
-
+        material_train_fair_acc = get_fair_acc(self.material_train_faircorrect_map, self.material_train_count_map)
         self.logger.experiment.log_metric("material_train_fair_acc", material_train_fair_acc, step=self.step)
 
       if self.size_flag:
@@ -458,16 +508,7 @@ class LightningCLEVRClassifier(pl.LightningModule):
         self.logger.experiment.log_metric("size_train_acc", size_train_acc, step=self.step)
         self.size_train_correct = 0
 
-        size_train_fair_acc = 0
-        for lbl, correct_count in self.size_train_faircorrect_map.items():
-          total_count = self.size_train_count_map[lbl]
-          assert total_count >= correct_count, "Incorrectly incremented maps."
-          size_train_fair_acc += correct_count / total_count
-        size_train_fair_acc /= len(self.size_train_count_map)
-
-        self.size_train_faircorrect_map.clear()
-        self.size_train_count_map.clear()
-
+        size_train_fair_acc = get_fair_acc(self.size_train_faircorrect_map, self.size_train_count_map)
         self.logger.experiment.log_metric("size_train_fair_acc", size_train_fair_acc, step=self.step)
 
       concat_label_train_acc = round(self.concat_label_train_correct/self.train_size, 6)
@@ -504,26 +545,23 @@ class LightningCLEVRClassifier(pl.LightningModule):
             self.logger.experiment.log_metric("shape_acc", shape_val_acc, step=self.step)
             self.shape_val_correct = 0
 
+            shape_val_fair_acc = get_fair_acc(self.shape_val_faircorrect_map, self.shape_val_count_map)
+            self.logger.experiment.log_metric("shape_val_fair_acc", shape_val_fair_acc, step=self.step)
+
           if self.color_flag:
             color_val_acc = round(self.color_val_correct/self.val_size, 6)
             self.logger.experiment.log_metric("color_acc", color_val_acc, step=self.step)
             self.color_val_correct = 0
+
+            color_val_fair_acc = get_fair_acc(self.color_val_faircorrect_map, self.color_val_count_map)
+            self.logger.experiment.log_metric("color_val_fair_acc", color_val_fair_acc, step=self.step)
 
           if self.material_flag:
             material_val_acc = round(self.material_val_correct/self.val_size, 6)
             self.logger.experiment.log_metric("material_acc", material_val_acc, step=self.step)
             self.material_val_correct = 0
 
-            material_val_fair_acc = 0
-            for lbl, correct_count in self.material_val_faircorrect_map.items():
-              total_count = self.material_val_count_map[lbl]
-              assert total_count >= correct_count, "Incorrectly incremented maps."
-              material_val_fair_acc += correct_count / total_count
-            material_val_fair_acc /= len(self.material_val_count_map)
-
-            self.material_val_faircorrect_map.clear()
-            self.material_val_count_map.clear()
-
+            material_val_fair_acc = get_fair_acc(self.material_val_faircorrect_map, self.material_val_count_map)
             self.logger.experiment.log_metric("material_val_fair_acc", material_val_fair_acc, step=self.step)
 
           if self.size_flag:
@@ -531,41 +569,38 @@ class LightningCLEVRClassifier(pl.LightningModule):
             self.logger.experiment.log_metric("size_acc", size_val_acc, step=self.step)
             self.size_val_correct = 0
 
-            size_val_fair_acc = 0
-            for lbl, correct_count in self.size_val_faircorrect_map.items():
-              total_count = self.size_val_count_map[lbl]
-              assert total_count >= correct_count, "Incorrectly incremented maps."
-              size_val_fair_acc += correct_count / total_count
-            size_val_fair_acc /= len(self.size_val_count_map)
-
-            self.size_val_faircorrect_map.clear()
-            self.size_val_count_map.clear()
-
+            size_val_fair_acc = get_fair_acc(self.size_val_faircorrect_map, self.size_val_count_map)
             self.logger.experiment.log_metric("size_val_fair_acc", size_val_fair_acc, step=self.step)
 
           concat_label_val_acc = round(self.concat_label_val_correct/self.val_size, 6)
           self.logger.experiment.log_metric("concat_label_acc", concat_label_val_acc, step=self.step)
           self.concat_label_val_correct = 0
-      elif dataset_idx == 1:
+      else:
+        # Offset by -1 to get the value in concat_disallowed_combos, used for the key.
+        dataset_idx = dataset_idx - 1
+        disallowed_combo = self.concat_disallowed_combos[dataset_idx]
+
         # Now, handle the out of distribution batch of data.
         inputs, concat_labels = val_batch
         concat_preds = self.forward(inputs)
 
-        marginal_labels = self.split_lbl_by_properties(concat_labels)
-        # Call this loss helper method on the split labels and preds.
-
-        self.val_attribute_accuracy_map = update_accuracy_map(attribute_set=self.attribute_set, 
-                                                          preds=torch.cat(concat_preds, dim=1), 
-                                                          labels=concat_labels, accuracy_map=self.val_attribute_accuracy_map)
+        # Update the correct accuracy_map.
+        attribute_set = self.map_of_attribute_sets[disallowed_combo]
+        acc_map = self.val_attribute_accuracy_map[disallowed_combo]
+        acc_map = update_accuracy_map(attribute_set=attribute_set,
+                                      preds=torch.cat(concat_preds, dim=1),
+                                      labels=concat_labels,
+                                      accuracy_map=acc_map)
         
         if batch_idx == self.num_out_dist_val_batches - 1:
-          print(f"Logging out dist validation accuracy at val_batch {batch_idx}")
-          for attribute, counts in self.val_attribute_accuracy_map.items():
+          print(f"Logging out dist validation accuracy for {disallowed_combo} at val_batch {batch_idx}.")
+
+          for attribute, counts in acc_map.items():
             att_acc = round(counts[0]/counts[1], 6)
-            self.logger.experiment.log_metric(f"out_dist_{attribute}_acc", att_acc, step=self.step)
+            self.logger.experiment.log_metric(f"{disallowed_combo}_{attribute}_acc", att_acc, step=self.step)
 
             zero_correct, zero_total, one_correct, one_total = counts[2]
             fair_att_acc = round(0.5 * (zero_correct/zero_total + one_correct/one_total), 6)
-            self.logger.experiment.log_metric(f"out_dist_fair_{attribute}_acc", fair_att_acc, step=self.step)
+            self.logger.experiment.log_metric(f"{disallowed_combo}_fair_{attribute}_acc", fair_att_acc, step=self.step)
 
-          self.val_attribute_accuracy_map.clear()
+          acc_map.clear()
